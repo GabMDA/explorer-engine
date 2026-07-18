@@ -2,7 +2,10 @@
   "name": "@explorer-engine/core",
   "version": "0.0.0",
   "private": true,
-  "description": "Headless core (no DOM, no WebGL): orchestration, ports, render-state resolver, states, focus, selection, animation, config, typed event bus, diagnostics. No engine code yet (P0-T1).",
+  "description": "Headless core (no DOM, no WebGL): P0-T4 skeleton — engine create/dispose lifecycle, typed event bus, diagnostics logger. Orchestration, ports, render-state resolver, states, focus, selection, animation and config arrive in later phases.",
   "license": "UNLICENSED",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
 }
