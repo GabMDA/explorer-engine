@@ -44,4 +44,4 @@ La conception v1 plaçait le rendu (Three.js/WebGL) **et** l'UI (DOM) au même n
 
 ## Notes
 
-Le choix d'implémentation de l'UI (Web Components) fait l'objet d'ADR-004… non : voir la partie UI dans [chapitre 12](../12-interface-utilisateur.md) ; l'implémentation exacte (Lit vs vanilla) reste un arbitrage ouvert (O2) sans impact sur le contrat `UiPort`.
+Le contrat d'UI agnostique (`UiPort`) et son implémentation par défaut en Web Components sont décrits au [chapitre 12](../12-interface-utilisateur.md). Le choix exact de la techno Web Components (Lit vs Custom Elements vanilla) reste un arbitrage ouvert (O2), sans impact sur le contrat `UiPort`.

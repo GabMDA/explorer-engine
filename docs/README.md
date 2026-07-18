@@ -59,6 +59,17 @@ Cette documentation est organisée en **chapitres numérotés**. Chaque chapitre
 | — | [Glossaire](./99-glossaire.md) | Terminologie de référence | Tous |
 | — | [Revue v1](./reviews/architecture-review-v1.md) · [Change-log v2](./reviews/spec-v2-change-log.md) | Revue d'architecture & suivi des corrections | Architectes |
 
+### Gouvernance & process
+
+| Document | Objet |
+|----------|-------|
+| [ENGINE_CONSTITUTION.md](../ENGINE_CONSTITUTION.md) | Les invariants absolus (lois L1–L29) — priment sur toute PR. |
+| [Architecture Decision Records](./adr/README.md) | Le *pourquoi* des décisions majeures (ADR-001 → 007). |
+| [DEVELOPMENT_WORKFLOW.md](./DEVELOPMENT_WORKFLOW.md) | Branche → dev → tests → revue → merge → doc. |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | Guide contributeur (style, plugin, package, commits, PR). |
+| [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md) | Quand une tâche est *terminée*. |
+| [CODE_REVIEW_CHECKLIST.md](./CODE_REVIEW_CHECKLIST.md) | Checklist avant chaque Pull Request. |
+
 > **Spec v2** : chapitres 19–20 ajoutés et chapitres 02, 03, 04, 05–16, 18 amendés après revue d'architecture. Détail dans le [change-log v2](./reviews/spec-v2-change-log.md).
 
 ---
