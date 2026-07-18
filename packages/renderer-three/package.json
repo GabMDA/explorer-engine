@@ -2,7 +2,17 @@
   "name": "@explorer-engine/renderer-three",
   "version": "0.0.0",
   "private": true,
-  "description": "RendererPort adapter — the ONLY package allowed to import Three.js. No code and no three dependency yet (deferred to P1).",
+  "description": "RendererPort adapter — the ONLY package allowed to import Three.js. P1-T1: WebGL renderer (canvas, color space, tone mapping, resize, pixel ratio, dispose).",
   "license": "UNLICENSED",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@explorer-engine/core": "0.0.0",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.185.1"
+  }
 }
