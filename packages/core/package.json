@@ -5,6 +5,12 @@
   "description": "Headless core (no DOM, no WebGL): P0-T4 skeleton — engine create/dispose lifecycle, typed event bus, diagnostics logger. Orchestration, ports, render-state resolver, states, focus, selection, animation and config arrive in later phases.",
   "license": "UNLICENSED",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
