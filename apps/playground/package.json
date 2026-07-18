@@ -1,0 +1,17 @@
+{
+  "name": "@explorer-engine/playground",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Development playground (P0-T3): a minimal host page with a Vite dev server + HMR. No engine code, no 3D — used only to verify the dev environment starts.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "vite": "8.1.5"
+  }
+}
