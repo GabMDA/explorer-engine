@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Minimal least-privilege permissions for the workflow token.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install (clean, from lockfile)
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint (style + cycles + deep imports + headless-core)
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format
+
+      - name: Architecture guard (headless core)
+        run: npm run check:arch
+
+      - name: Tests
+        run: npm run test
+
+      - name: Build (empty)
+        run: npm run build
