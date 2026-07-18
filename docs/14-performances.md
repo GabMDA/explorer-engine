@@ -174,13 +174,39 @@ On n'optimise que ce que l'on mesure. Le module **Diagnostics** (chapitre 02) fo
 
 ---
 
-## 14.10 Règles normatives (synthèse)
+## 14.10 Précisions v2
+
+### 14.10.1 Rendu à la demande = `requestRender()` + frame ownership (C7)
+
+Le « rendu à la demande » est formalisé par le contrat `requestRender()` / `acquireFrameLoop()` (chapitre 02) : la boucle dort par défaut et ne tourne en continu que tant qu'un **frame handle** vit (animation, clip en boucle, plugin). Cela concilie économie d'énergie **et** animations continues (correction v1 F11).
+
+### 14.10.2 Précision de profondeur (C15)
+
+Sur une plage d'échelles extrême (montre en mm ↔ fusée en dizaines de m), le z-buffer float provoque du z-fighting. Mesures : **normalisation vers un volume unité** au chargement (`model.normalizeToUnit`, défaut), **near/far dérivés** de la bounding box, et **buffer de profondeur logarithmique** optionnel (`model.depthLog`, capacité `"depth-log"`) pour les objets à grande dynamique interne (chapitre 06).
+
+### 14.10.3 Occlusion sans stall (C13)
+
+L'occlusion des hotspots utilise un **raycast BVH throttlé** (ou depth **asynchrone**), **jamais** de lecture depth synchrone (`readPixels`) qui figerait le pipeline (chapitre 07).
+
+### 14.10.4 Hébergement des décodeurs WASM & isolation (C17)
+
+Les décodeurs **Draco/KTX2/Basis/Meshopt** (WASM) sont **auto-hébergés et versionnés** (pas de CDN tiers non maîtrisé). Documentation des exigences : **CSP** compatible (`wasm-unsafe-eval` si requis), et **COOP/COEP** (`cross-origin-isolation`) si le transcodeur utilise les threads/`SharedArrayBuffer`. Un **repli non-threadé** est prévu si l'isolation cross-origin n'est pas disponible.
+
+### 14.10.5 Annulation de chargement (C16)
+
+Un `load()` interrompu **annule** fetches et décodeurs (jeton `AbortSignal`) ; un seul chargement actif à la fois (chapitre 04).
+
+---
+
+## 14.11 Règles normatives (synthèse)
 
 1. **60 FPS** sur desktop moyen, **≥ 30 FPS** sur mobile récent, comme contrainte de conception.
-2. **Rendu à la demande** : pas de rendu sur scène statique.
+2. **Rendu à la demande** via `requestRender()`/frame handles : pas de rendu sur scène statique, pas de clip figé (C7).
 3. **Qualité adaptative** : dégradation/upgrade automatique selon le budget.
-4. **Draco + KTX2 + Meshopt** par défaut ; **KTX2** pour la mémoire GPU.
-5. **Lazy loading en cascade** : critique d'abord, reste différé/à la demande/anticipé.
+4. **Draco + KTX2 + Meshopt** par défaut (décodeurs auto-hébergés) ; **KTX2** pour la mémoire GPU.
+5. **Lazy loading en cascade** + **annulation** des chargements (C16).
 6. **Zéro fuite mémoire** : `dispose` systématique ; zéro allocation par frame en boucle chaude.
 7. **Instancing** pour tout élément répété.
-8. **Mesurer** en continu (Diagnostics + budgets + tests de perf CI).
+8. **Précision de profondeur** maîtrisée (normalisation unité + depth log optionnel — C15).
+9. **Occlusion sans readback synchrone** (C13).
+10. **Mesurer** en continu (Diagnostics + budgets + tests de perf CI).

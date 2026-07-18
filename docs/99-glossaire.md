@@ -4,6 +4,27 @@
 
 ---
 
+## Termes de la spec v2 (corrections d'architecture)
+
+| Terme | Définition |
+|-------|------------|
+| **Render State Resolver (RSR)** | Module noyau qui compose l'état visuel à partir de **couches** déclaratives et l'applique via le `RendererPort`. Remplace la mutation impérative « mémoriser/restaurer » (chapitre 19). |
+| **Couche (Layer / Contribution)** | Contribution déclarative typée `{ source, target, channel, value, priority }` publiée au RSR. Entrer dans un état/focus = ajouter des couches ; en sortir = les retirer. |
+| **Canal (Channel)** | Dimension visuelle indépendante composée par le RSR : `transform`, `opacity`, `colorOverride`, `visibility`, `outline`, `cameraIntent`, `lightingIntent`. |
+| **Rest pose canonique** | État géométrique/matériau du modèle au chargement (après normalisation). Seule référence des `transform` (offsets **absolus**). |
+| **Core headless** | `@explorer-engine/core` : logique sans DOM ni WebGL, ne connaissant que des **ports**. |
+| **Port / Adaptateur** | Contrat (`RendererPort`, `UiPort`, `InputPort`) implémenté par un adaptateur (`renderer-three`, `ui-webcomponents`, `input-dom`). Architecture hexagonale. |
+| **`explorerId`** | Identité stable d'un nœud (`node.extras.explorerId`), résistante au ré-export. Le nom de nœud n'est qu'un repli avec avertissement. |
+| **`Address`** | Adressage typé d'une cible : `{ kind: "component" \| "group" \| "node", id }`. Remplace les préfixes de chaîne (`"group:..."`). |
+| **Catalogue d'événements typé** | Association `nom → payload` vérifiée à la compilation ; remplace les événements en chaînes libres. |
+| **`requestRender()` / Frame handle** | Contrat de rendu : `requestRender()` demande une frame ; un `acquireFrameLoop()` (frame handle) maintient la boucle active tant qu'une animation vit. |
+| **Statechart** | Modèle des états : région principale (bases exclusives) + régions parallèles (modifiers) + exclusions. |
+| **RuntimeState** | État runtime sérialisable (base + modifiers + focus stack + vue + sélection) pour deep-linking/historique/partage/multijoueur (chapitre 20). |
+| **`requiredCapabilities`** | Capacités qu'un package attend du runtime ; absence → dégradation gracieuse (réconcilie portabilité et plugins). |
+| **Runtime de référence** | Profil officiel garantissant un jeu de plugins/capacités standard. |
+
+---
+
 ## Concepts fondamentaux
 
 | Terme | Définition |
@@ -50,13 +71,13 @@
 | **Occlusion** | Masquage d'un hotspot situé derrière la géométrie. |
 | **Projection** | Conversion d'une position 3D en coordonnées écran 2D. |
 | **Clustering** | Regroupement de hotspots qui se chevauchent à l'écran. |
-| **Focus** | Mécanisme de mise en avant d'un composant (zoom + isolation + info). |
-| **Focus Stack** | Pile des focus imbriqués permettant le retour niveau par niveau. |
-| **Selection / Picking** | Détermination de l'objet visé par le pointeur (raycasting). |
+| **Focus** | **Mécanisme** (v2, pas un état) de mise en avant d'un composant : publie des couches (cameraIntent, dim, outline) au RSR. |
+| **Focus Stack** | Pile des focus imbriqués permettant le retour niveau par niveau (partie de `RuntimeState`). |
+| **Selection / Picking** | Détermination de l'objet visé par le pointeur (raycasting), résolue en `Address` typée. |
 | **pickTarget** | Granularité de sélection : quel composant est sélectionné au clic. |
-| **État (State)** | Configuration nommée de l'objet (Closed, Open, Exploded, Transparent, Cutaway, Focus…). |
-| **État base** | État exclusif (un seul actif à la fois). |
-| **État modifier** | État combinable superposé à l'état de base (ex. X-ray). |
+| **État (State)** | Configuration nommée de l'objet (Closed, Open, Exploded, Transparent, Cutaway). *(v2 : `Focus` **n'est plus** un état — c'est un mécanisme.)* |
+| **État base** | État exclusif (région principale du statechart). |
+| **État modifier** | État combinable (région parallèle du statechart, ex. X-ray). |
 | **Transition** | Passage animé d'un état/vue à un autre. |
 | **Cutaway** | Vue en coupe (via clipping planes). |
 | **Exploded view** | Vue éclatée : composants écartés pour montrer l'assemblage. |
@@ -67,7 +88,7 @@
 | Terme | Définition |
 |-------|------------|
 | **Tween** | Interpolation d'une propriété d'une valeur à une autre dans le temps. |
-| **Timeline** | Séquence composée d'animations parallèles/séquentielles avec offsets et markers. |
+| **Timeline** | Composition d'**animations atomiques** (parallèles/séquentielles) au niveau du noyau. *(v2 : la scénarisation riche — DSL — est retirée du core et confiée au plugin `guided-tour`.)* |
 | **Clip** | Animation embarquée dans le GLB, jouée par un mixer. |
 | **Easing** | Fonction d'accélération d'une animation (linear, easeInOut…). |
 | **Marker / Label** | Point nommé d'une timeline utilisé pour la synchronisation. |

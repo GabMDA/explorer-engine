@@ -6,6 +6,27 @@
 
 ---
 
+## 16.0 Prérequis d'architecture v2 (à intégrer aux phases)
+
+La spec v2 introduit des fondations qui **précèdent** ou **modifient** certaines tâches. Elles sont à insérer aux phases indiquées **avant** de coder le reste de la phase :
+
+| Prérequis v2 | Corr. | S'insère en | Impact sur les tâches existantes |
+|--------------|-------|-------------|----------------------------------|
+| **Ports & core headless** (`RendererPort`/`UiPort`/`InputPort`) | C2/C3 | **P0** (avant P1) | Le Renderer/UI deviennent des **adaptateurs** ; P1/P7 ciblent des adaptateurs. Test CI « pas de `three`/DOM dans core ». |
+| **Render State Resolver** (chapitre 19) | C1 | **P4 (avant Focus/États)** | Nouveau module noyau. Focus (P5) et États (P6) le **consomment** (produisent des couches). |
+| **Event Bus typé** + anti-cycle exécutable | C9/C6 | **P0** | Catalogue typé dès le bus (P0-T4) ; lint anti-cycle en CI (P0-T2). |
+| **Identité `explorerId`** + adressage typé | C5 | **P2 (indexation)** | P2-T4 indexe par `explorerId` ; `optimize-model` (P3-T4/outillage) génère/préserve les ids. |
+| **`requestRender()` + frame ownership** | C7 | **P1-T5** | Remplace la formulation « rendu à la demande » par le contrat frame handles. |
+| **État runtime sérialisable** (chapitre 20) | C10 | **P3/P6** (exigence) ; module `Navigation` en **P7** | `serialize/apply` dès la machine à états ; URL binding en P7. |
+| **Occlusion BVH sans readback** | C13 | **P4-T3** | La stratégie d'occlusion est fixée (BVH/async), pas « depth test » naïf. |
+| **Statecharts** (régions parallèles) | C11 | **P6-T1** | La machine à états est un statechart dès le départ. |
+| **Scénarios en plugin** (pas de DSL core) | C12 | **P8-T2** | Aucune tâche de « timeline DSL » ; le Tour porte la scénarisation. |
+| **Compat schéma / annulation chargement / depth** | C14/C16/C15 | **P3 / P2** | Politique de compat au schéma (P3-T1) ; annulation au Resource Manager (P2-T1) ; normalisation au Model Loader (P2-T2). |
+
+> **Règle** : ces prérequis ne créent pas une phase séparée ; ils **s'intègrent** aux phases existantes en tête de celles-ci. Le principe « une tâche validée à la fois » reste inchangé.
+
+---
+
 ## 16.1 Vue d'ensemble des phases
 
 ```mermaid

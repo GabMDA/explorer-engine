@@ -130,6 +130,8 @@ Certains éléments 3D/hybrides sont thématisés via des tokens partagés :
 
 Cela garantit que la 3D et l'UI partagent la **même identité** (l'accent de la marque colore aussi les hotspots et l'outline).
 
+> **Conversion de color space (v2, C17)** : les tokens de couleur sont exprimés en **sRGB** (chaînes CSS, pour l'UI). Lorsqu'un token alimente la **scène 3D** (fond, couleur de hotspot, outline), l'adaptateur de rendu applique une conversion **sRGB → linéaire** avant usage dans le pipeline PBR. Cette conversion est la **responsabilité du `RendererPort`** (le core reste agnostique du rendu). Sans elle, les couleurs de marque apparaîtraient délavées/incohérentes entre UI et 3D.
+
 ---
 
 ## 13.7 Personnalisation par un package (exemple)

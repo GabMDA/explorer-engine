@@ -205,11 +205,25 @@ Ce diagramme préfigure la structure du `config.json`, détaillée au chapitre s
 
 ---
 
-## 4.8 Règles d'or du package (synthèse normative)
+## 4.8 Portabilité et capacités (v2, C8)
 
-1. Un package est **autonome, portable et data-only**.
-2. Tous les chemins sont **relatifs** à la racine du package.
-3. Les identifiants de composants **correspondent** aux nœuds du GLB.
-4. Le package déclare une **`schemaVersion`**.
-5. Le moteur **valide** et **dégrade gracieusement** ; il ne plante jamais sur un package imparfait.
+La v1 disait un package « autonome et portable » tout en exigeant que ses plugins soient enregistrés côté hôte — contradiction. Reformulation v2 :
+
+- Un package est **data-only et portable sur tout runtime conforme au profil de capacités qu'il déclare** (`requiredCapabilities`, chapitre 05).
+- Le **runtime de référence** garantit un jeu de plugins/capacités standard (chapitre 10) ; un package n'utilisant que ces capacités est portable partout.
+- Une capacité `required` absente → **dégradation gracieuse** (fonctionnalité désactivée + diagnostic), jamais d'échec global ; `optional` absente → ignorée.
+
+## 4.9 Chargement : annulation et concurrence (v2, C16)
+
+- Le pipeline de chargement (fetch → décodage WASM Draco/KTX2 → build) est **annulable de bout en bout** via un **jeton d'annulation** (`AbortSignal`).
+- Politique : **un seul chargement actif à la fois** — un nouveau `load(url)` **annule proprement** le précédent (fetches avortés, décodeurs stoppés, ressources partielles libérées), sans race ni fuite.
+- Le `dispose` du package sortant est coordonné avec l'annulation.
+
+## 4.10 Règles d'or du package (synthèse normative — v2)
+
+1. Un package est **data-only** et **portable sur tout runtime conforme au profil de capacités déclaré** (C8).
+2. Tous les chemins sont **relatifs** à la racine du package ; les `$ref` aussi (C17).
+3. Les composants référencent les nœuds par **`explorerId`** (repli nom + warning — C5).
+4. Le package déclare une **`schemaVersion`** (+ `requiredCapabilities` si besoin).
+5. Le moteur **valide**, **dégrade gracieusement** et **annule proprement** les chargements ; il ne plante jamais.
 6. Aucun package ne requiert de **modification du moteur** pour fonctionner (P1).

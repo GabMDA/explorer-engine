@@ -32,7 +32,12 @@ La spécification complète se trouve dans [`docs/`](./docs/README.md). Commence
 | 16 | [Roadmap](./docs/16-roadmap.md) |
 | 17 | [Bonnes pratiques](./docs/17-bonnes-pratiques.md) |
 | 18 | [Évolutions futures](./docs/18-evolutions-futures.md) |
+| 19 | [Render State Resolver](./docs/19-render-state-resolver.md) *(noyau v2)* |
+| 20 | [État runtime sérialisable & deep-linking](./docs/20-runtime-state-serialization.md) *(noyau v2)* |
 | — | [Glossaire](./docs/99-glossaire.md) |
+| — | [Revue d'architecture v1](./docs/reviews/architecture-review-v1.md) · [Change-log spec v2](./docs/reviews/spec-v2-change-log.md) |
+
+> **Spec v2** — La spécification a été révisée après une revue d'architecture. Les chapitres **19** (Render State Resolver) et **20** (état sérialisable) sont des ajouts noyau ; les chapitres 02, 03, 05–13 ont été amendés (core headless + adaptateurs, Focus = mécanisme, identité `explorerId`, événements typés, `requestRender`, occlusion sans readback, statecharts). Voir le [change-log](./docs/reviews/spec-v2-change-log.md).
 
 ## 🧭 Principes non négociables
 

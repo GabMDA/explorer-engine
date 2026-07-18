@@ -38,21 +38,31 @@
 
 ### 15.3.1 Règles structurantes (rappel + précisions)
 
-1. **Graphe de dépendances acyclique (DAG)** entre modules (chapitre 02). Un cycle = défaut d'architecture.
-2. **Encapsulation par module** : l'extérieur importe uniquement l'API publique (`index`), jamais un fichier interne (chapitre 03).
-3. **Dépendances inversées** : un module reçoit ses dépendances (injection) plutôt que de les instancier lui-même.
-4. **Communication montante par événements** ; communication descendante par appels via le Core.
-5. **Aucune connaissance d'objet spécifique** nulle part (P1) — pas de branchement conditionnel sur un type d'objet.
+1. **Graphe de dépendances acyclique (DAG)** entre modules (chapitre 02). Un cycle = défaut d'architecture, **vérifié automatiquement** (voir 15.3.5).
+2. **Core headless (v2, C2)** : `packages/core` n'importe **ni Three.js ni le DOM** ; il ne connaît que des **ports** (`RendererPort`, `UiPort`, `InputPort`). Vérifié en CI (interdiction d'import).
+3. **Encapsulation par module** : l'extérieur importe uniquement l'API publique (`index`), jamais un fichier interne (chapitre 03).
+4. **Dépendances inversées** : un module reçoit ses dépendances (injection) plutôt que de les instancier lui-même.
+5. **Communication montante par événements typés** ; communication descendante par appels via le Core/ports.
+6. **Aucune connaissance d'objet spécifique** nulle part (P1) — pas de branchement conditionnel sur un type d'objet.
+7. **Aucune mutation directe de la scène** : l'état visuel passe **exclusivement** par des couches du Render State Resolver (chapitre 19, C1).
 
 ### 15.3.2 Injection de dépendances
 
-Le **Core** est le **compositeur** : il instancie les managers et leur fournit leurs dépendances (Event Bus, autres managers via interfaces, config). Aucun manager ne crée ses propres dépendances lourdes en dur. Cela facilite le test (mock) et l'évolution (substitution).
+Le **Core** est le **compositeur** : il instancie les modules du core, **branche les adaptateurs** (ports) fournis par l'hôte, et fournit à chacun ses dépendances (Event Bus typé, RSR, config). Aucun module ne crée ses dépendances lourdes en dur. Cela facilite le test (mock des ports) et l'évolution (substitution d'adaptateur).
 
 ### 15.3.3 État et immutabilité
 
 - La **config résolue** est **immuable** après chargement (source de vérité du contenu).
-- L'état runtime (état courant, focus stack…) est **encapsulé** dans son manager, muté par des méthodes explicites, et chaque mutation significative **émet un événement**.
-- Pas d'état global mutable partagé hors des managers.
+- L'état visuel est **dérivé** par le Render State Resolver à partir de **couches** (pas de mutation impérative dispersée — C1).
+- L'**état runtime** (base, modifiers, focus stack, vue) est encapsulé, muté par des méthodes explicites, **sérialisable** (chapitre 20, C10), et chaque mutation significative **émet un événement typé**.
+- Pas d'état global mutable partagé hors des modules.
+
+### 15.3.5 Événements typés & règles exécutables (v2, C9/C6)
+
+- **Catalogue d'événements typé** : les événements sont une union typée `nom → payload` ; nom inconnu ou payload invalide = **erreur de compilation**. Interdiction des chaînes d'événement libres (règle de lint).
+- **Pas de données par frame sur le bus** : les données chaudes passent par les ports/RSR, jamais par l'Event Bus (revue + lint ciblé).
+- **Anti-cycle exécutable** : une **règle de lint** (détection de cycles d'import) **et** un **test de non-régression du graphe de dépendances** échouent la CI en cas de cycle. Le DAG n'est pas qu'une intention : il est **vérifié**.
+- **Frontière Three.js** : un test CI vérifie que `three` n'apparaît **que** dans `renderer-three`.
 
 ### 15.3.4 Gestion des erreurs
 
