@@ -98,9 +98,9 @@ Extension du plugin Guided Tour :
 **Vision** : plusieurs utilisateurs explorent **ensemble** le même objet (formation à distance, revue produit, showroom guidé).
 
 - **Fonctions** : présence (avatars/curseurs), synchronisation de l'état (caméra d'un guide, état courant, focus), pointage partagé, voix/chat.
-- **Ancrage architectural** : l'**état observable** (événements `state:changed`, `focus:*`, caméra) rend la synchronisation possible ; un **plugin de transport** (WebRTC/WebSocket) diffuse et applique les états distants. Le moteur reste **déterministe** (P9), ce qui facilite la cohérence.
-- **Modes** : « suivi du guide » (une personne pilote, les autres suivent) ; « exploration libre partagée » (curseurs/annotations visibles).
-- **Impact** : moyen — surtout un plugin + une couche de synchronisation d'état ; le noyau expose déjà l'état nécessaire.
+- **Ancrage architectural (v2)** : le multijoueur repose sur la **synchronisation d'état** — pas sur une simulation déterministe (le déterminisme *de rendu* est illusoire en WebGL/async ; correction v1 F20). Le module d'**état runtime sérialisable** (chapitre 20) fournit `serialize`/`apply`/`diff`/`patch` ; un **plugin de transport** (WebRTC/WebSocket) diffuse des **snapshots/patches** que les pairs **appliquent** via le Render State Resolver. Même état macroscopique partout, indépendamment des micro-différences de rendu.
+- **Modes** : « suivi du guide » (un pair pousse son `RuntimeState`, les autres l'appliquent) ; « exploration libre partagée » (curseurs/sélections superposés).
+- **Impact** : moyen — surtout un plugin de transport au-dessus de la sérialisation d'état **déjà présente au noyau** (chapitre 20). P9 est reprécisé : « transitions **logiques** déterministes à entrées égales », pas déterminisme de rendu.
 
 ---
 
