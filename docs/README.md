@@ -54,7 +54,12 @@ Cette documentation est organisée en **chapitres numérotés**. Chaque chapitre
 | 16 | [Roadmap](./16-roadmap.md) | Découpage en tâches indépendantes, validables | Chefs de projet, développeurs |
 | 17 | [Bonnes pratiques](./17-bonnes-pratiques.md) | Règles à respecter pendant le développement | Tous les développeurs |
 | 18 | [Évolutions futures](./18-evolutions-futures.md) | Explorer Studio, IA, VR, multijoueur… | Direction, architectes |
+| 19 | [Render State Resolver](./19-render-state-resolver.md) | État de rendu déclaratif à couches (noyau, **spec v2**) | Architectes, développeurs |
+| 20 | [État runtime sérialisable](./20-runtime-state-serialization.md) | Deep-linking, historique, partage d'URL (noyau, **spec v2**) | Architectes, développeurs |
 | — | [Glossaire](./99-glossaire.md) | Terminologie de référence | Tous |
+| — | [Revue v1](./reviews/architecture-review-v1.md) · [Change-log v2](./reviews/spec-v2-change-log.md) | Revue d'architecture & suivi des corrections | Architectes |
+
+> **Spec v2** : chapitres 19–20 ajoutés et chapitres 02, 03, 04, 05–16, 18 amendés après revue d'architecture. Détail dans le [change-log v2](./reviews/spec-v2-change-log.md).
 
 ---
 
