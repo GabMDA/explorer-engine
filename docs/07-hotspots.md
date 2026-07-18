@@ -1,5 +1,7 @@
 # Chapitre 07 — Hotspots
 
+> **Révisé en spec v2 (corrections C13, C2, C5, C9).** La **logique** hotspot (ancrage, cycle de vie, décision d'occlusion) vit dans le **core headless** ; la **projection 3D→2D** et l'**occlusion** sont calculées par l'adaptateur `RendererPort` et transmises via le port (données chaudes **hors bus**, C9). Ancrage en **adressage typé** (`explorerId`/composant, C5). Occlusion **sans readback synchrone** (C13).
+
 > Les hotspots sont les points d'intérêt ancrés sur le modèle 3D et projetés en 2D à l'écran. Ils sont la principale porte d'entrée de l'interaction. Ce chapitre décrit leur fonctionnement complet : création, projection, interaction, animations, cycle de vie, occlusion, comportement et accessibilité.
 
 ---
@@ -80,15 +82,17 @@ La projection par frame de nombreux hotspots peut être coûteuse. Le moteur :
 
 Un hotspot dont l'ancre est **cachée derrière la géométrie** ne devrait pas s'afficher comme s'il était visible (sinon confusion : on « voit » un point situé de l'autre côté de l'objet).
 
-### 7.4.1 Stratégies d'occlusion
+### 7.4.1 Stratégies d'occlusion (v2, C13)
 
-| Stratégie | Principe | Coût | Précision |
-|-----------|----------|------|-----------|
-| **Raycast** | Rayon caméra → ancre ; si un mesh est touché avant l'ancre, elle est occultée. | Moyen | Bonne |
-| **Depth buffer test** | Comparer la profondeur projetée de l'ancre au depth buffer. | Faible (GPU) | Bonne, nécessite lecture depth |
+> **Règle absolue (v2)** : **aucune lecture synchrone GPU→CPU** (`readPixels`, lecture de depth buffer bloquante). Ce type de readback **fige le pipeline** et détruit le frame budget (l'inverse de l'objectif du chapitre 14). La stratégie « depth buffer test » naïve de la v1 est **retirée**.
+
+| Stratégie (v2) | Principe | Coût | Statut |
+|----------------|----------|------|--------|
+| **Raycast BVH** (par défaut) | Rayon caméra → ancre, testé contre un **BVH des volumes englobants** des occultants majeurs (pas la géométrie fine), **throttlé** (quelques Hz). | Faible/Moyen (CPU) | **Recommandé** |
+| **Depth asynchrone** (avancé) | Lecture depth **non bloquante** (PBO / readback async), latence ~1 frame. | Faible (GPU, async) | Optionnel, capacité dédiée |
 | **Aucune** | `occludable: false` (toujours visible). | Nul | — |
 
-Le comportement par défaut est `occludable: true`. La stratégie concrète est un détail d'implémentation choisi pour respecter le budget de performance (raycast throttlé, ou depth test).
+Le comportement par défaut est `occludable: true` via **raycast BVH throttlé**. Ce calcul appartient à l'adaptateur de rendu (`RendererPort`), qui expose au core un simple booléen d'occlusion par hotspot ; la **logique** hotspot reste dans le core headless (C2).
 
 ### 7.4.2 Comportement d'un hotspot occulté
 

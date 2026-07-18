@@ -1,5 +1,7 @@
 # Chapitre 11 — Animation Engine
 
+> **Révisé en spec v2 (corrections C12, C7).** Le moteur d'animation se limite à l'**interpolation** et à l'enchaînement d'**animations atomiques** ; la **scénarisation** (DSL de séquence) est retirée du noyau et confiée au plugin `guided-tour`. Il implémente le **frame ownership** (`acquireFrameLoop`/release) du contrat `requestRender()`.
+
 > L'Animation Engine (Animation Manager) est le moteur temporel : il interpole des valeurs dans le temps et orchestre des séquences. Ce chapitre décrit les timelines, transitions, événements, la synchronisation et les séquences. Presque tous les modules d'interaction s'appuient sur lui.
 
 ---
@@ -76,24 +78,20 @@ gantt
 - Une timeline expose : `play`, `pause`, `seek(t)`, `reverse`, `timeScale`, `progress`.
 - Les timelines peuvent être **imbriquées** (une timeline dans une timeline).
 
-### 11.3.2 Timelines déclaratives
+### 11.3.2 Périmètre v2 : interpolation, PAS scénarisation (C12)
 
-Le `config.animations.timelines` (chapitre 05) permet de définir des séquences **sans code** : chaque étape référence une action (transition d'état, focus, clip, ouverture de panneau, événement) avec un `at` (temps de départ) et une `duration`. Cela rend les visites/présentations scénarisables par les créateurs de contenu (P2).
+**Décision v2** : le noyau d'animation ne contient **aucun DSL de scénario**. Le champ `config.animations.timelines` (avec des `action` : état/focus/panneau…) de la v1 est **supprimé du schéma** ([chapitre 05](./05-config-format.md)).
 
-Exemple conceptuel :
+Raison : un DSL de scénario en JSON dérive inévitablement vers un langage (conditions, boucles, variables), impossible à valider et à maintenir, et **doublait** le plugin Guided Tour. La v2 sépare nettement :
 
-```jsonc
-{
-  "timelines": [
-    { "id": "intro", "autoplay": false, "steps": [
-      { "at": 0,    "action": { "type": "camera", "view": "front" }, "duration": 1500 },
-      { "at": 1000, "action": { "type": "state",  "state": "exploded" }, "duration": 900 },
-      { "at": 2000, "action": { "type": "focus",  "target": "gpu" }, "duration": 600 },
-      { "at": 2600, "action": { "type": "openPanel", "panel": "p-gpu" } }
-    ]}
-  ]
-}
-```
+| Responsabilité | Où |
+|----------------|-----|
+| **Interpoler** une valeur, **enchaîner/paralléliser** des animations **atomiques** (tween, clip, transition de couche) | **Noyau** Animation Engine (ce chapitre) |
+| **Scénariser** (visite, présentation, narration branchée : « fais A puis focus B puis ouvre le panneau C ») | **Plugin `guided-tour`** (capacité `"scenario"`, [chapitre 10](./10-plugins.md)) |
+
+Ainsi, une timeline du noyau **compose des animations** (positions, opacités, caméra) mais ne « pilote » pas des états/UI par un langage déclaratif. Le plugin de scénario, lui, orchestre les transitions atomiques exposées par le core et **s'appuie** sur cet Animation Engine.
+
+> `config.animations` se limite désormais à **nommer des clips** et régler l'**`autoplay`** d'un **clip simple** (ex. ventilateur en boucle).
 
 ---
 
@@ -190,7 +188,17 @@ sequenceDiagram
 
 - L'Animation Engine est mis à jour **avant** le rendu, pour que la frame reflète les valeurs à jour.
 - Il maintient une **liste active** d'animations ; les terminées sont retirées (et **disposées**).
-- **Performance** : pas d'allocation par frame (réutilisation d'objets temporaires), boucle serrée, arrêt de la boucle si aucune animation active et scène statique (économie d'énergie — voir chapitre 14, rendu à la demande).
+- **Performance** : pas d'allocation par frame (réutilisation d'objets temporaires), boucle serrée.
+
+### 11.8.1 Frame ownership (v2, C7)
+
+L'Animation Engine est un **détenteur de frame handle**. Quand une animation démarre, il appelle `acquireFrameLoop()` (chapitre 02) : la boucle tourne en continu tant qu'au moins une animation est active. Quand la dernière animation se termine, il **libère** le handle → la boucle **se met en veille** (plus de rendu jusqu'au prochain `requestRender()`).
+
+- Un **clip GLB en boucle** (ventilateur) détient un handle **persistant** → la scène n'est jamais « statique » tant qu'il tourne, et le rendu continue légitimement à 60 FPS.
+- Une **transition** ponctuelle acquiert puis libère un handle.
+- Un changement de couche **hors animation** (application instantanée) déclenche un simple `requestRender()`.
+
+Ce contrat résout le conflit v1 (rendu à la demande vs animations continues, F11) : **jamais de clip figé**, **jamais de boucle 60 FPS inutile**.
 
 ---
 
