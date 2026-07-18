@@ -410,7 +410,7 @@ Détermine quel objet 3D est visé/sélectionné par l'utilisateur (picking).
 > Détaillé au [chapitre 09](./09-etats.md).
 
 ### Rôle
-Gère les **états macroscopiques** de l'objet (Closed, Open, Exploded, Transparent, Cutaway, Focus…) et leurs transitions.
+Gère les **états macroscopiques** de l'objet (Closed, Open, Exploded, Transparent, Cutaway…) et leurs transitions. *(v2 : `Focus` n'est **pas** un état — c'est un mécanisme, chapitre 08/C4.)*
 
 ### Responsabilités
 - Charger la **définition des états** depuis la config (quels groupes bougent/se transforment, quels réglages visuels).

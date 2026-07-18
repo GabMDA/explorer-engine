@@ -61,18 +61,20 @@ Une timeline est une **composition** d'étapes positionnées sur un axe temporel
 
 ```mermaid
 gantt
-    title Exemple de timeline "présentation"
+    title "Présentation" — orchestrée par le plugin guided-tour (C12), au-dessus des transitions atomiques du core
     dateFormat  X
     axisFormat %s
     section Caméra
     Travelling avant      :0, 2
     section Objet
-    État Exploded         :1, 3
+    Transition Exploded   :1, 3
     section UI
     Ouvrir panneau        :3, 1
     section Audio
     Narration             :1, 4
 ```
+
+> **Note v2** : ce scénario (qui enchaîne caméra + état + UI + audio) est **assemblé par le plugin `guided-tour`**, pas par un DSL du noyau. Le noyau fournit les briques atomiques (transition de couche, tween, clip) ; le plugin les **séquence**.
 
 - Les étapes peuvent se **chevaucher** (parallélisme) ou s'**enchaîner**.
 - Une timeline expose : `play`, `pause`, `seek(t)`, `reverse`, `timeScale`, `progress`.
