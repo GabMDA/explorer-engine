@@ -1,0 +1,11 @@
+{
+  // Root "solution" TypeScript config used by the `typecheck` script.
+  // Intentionally empty (`files: []`) at P0-T2: there is no source yet, so this
+  // performs a valid no-op type-check (exit 0). Per-package type-checking is
+  // wired as real source lands (P0-T4+). Compiler options come from the shared base.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "files": []
+}
