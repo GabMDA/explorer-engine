@@ -1,0 +1,8 @@
+{
+  "name": "@explorer-engine/renderer-three",
+  "version": "0.0.0",
+  "private": true,
+  "description": "RendererPort adapter — the ONLY package allowed to import Three.js. No code and no three dependency yet (deferred to P1).",
+  "license": "UNLICENSED",
+  "type": "module"
+}

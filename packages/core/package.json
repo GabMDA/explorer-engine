@@ -1,0 +1,8 @@
+{
+  "name": "@explorer-engine/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Headless core (no DOM, no WebGL): orchestration, ports, render-state resolver, states, focus, selection, animation, config, typed event bus, diagnostics. No engine code yet (P0-T1).",
+  "license": "UNLICENSED",
+  "type": "module"
+}

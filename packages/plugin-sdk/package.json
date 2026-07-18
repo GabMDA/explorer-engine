@@ -1,0 +1,8 @@
+{
+  "name": "@explorer-engine/plugin-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Stable, framework-agnostic API for authoring plugins (depends on core port contracts, never on core internals). No code yet (P0-T1).",
+  "license": "UNLICENSED",
+  "type": "module"
+}

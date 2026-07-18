@@ -1,0 +1,27 @@
+{
+  "name": "explorer-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo root for Explorer Engine — a generic, data-driven 3D object exploration engine. Scaffold only (P0-T1); no engine code yet.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/renderer-three",
+    "packages/ui-webcomponents",
+    "packages/input-dom",
+    "packages/plugin-sdk",
+    "packages/schema",
+    "packages/plugins/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present"
+  }
+}
