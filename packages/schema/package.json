@@ -1,0 +1,8 @@
+{
+  "name": "@explorer-engine/schema",
+  "version": "0.0.0",
+  "private": true,
+  "description": "config.json schema definition and validation, reusable by tooling. No code yet (P0-T1).",
+  "license": "UNLICENSED",
+  "type": "module"
+}

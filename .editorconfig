@@ -1,0 +1,18 @@
+# EditorConfig — shared editor conventions (https://editorconfig.org)
+# Supports the "conventions" deliverable of P0-T1 (chapter 03, chapter 15).
+# Automated lint/format tooling (Prettier/ESLint) is deferred to P0-T2.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{json,jsonc}]
+indent_size = 2

@@ -1,0 +1,8 @@
+{
+  "name": "@explorer-engine/ui-webcomponents",
+  "version": "0.0.0",
+  "private": true,
+  "description": "UiPort adapter — default UI implemented with Web Components. No code yet (deferred to P7).",
+  "license": "UNLICENSED",
+  "type": "module"
+}

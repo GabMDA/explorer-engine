@@ -1,0 +1,31 @@
+{
+  // Base TypeScript configuration shared by all packages (chapter 03 §3.2, chapter 15).
+  // Individual packages extend this via their own tsconfig.json.
+  //
+  // IMPORTANT: "lib" deliberately EXCLUDES "DOM" to enforce the headless-core
+  // invariant (ENGINE_CONSTITUTION L8/L9): DOM/WebGL types must only be enabled
+  // in the adapter packages that genuinely need them (ui-webcomponents, input-dom,
+  // renderer-three), never in the core.
+  //
+  // Type-check execution (invoking tsc) and CI wiring are deferred to P0-T2.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
+}
