@@ -25,9 +25,14 @@ Un plugin est un **objet conforme à un contrat** (interface) défini par le **`
 |---------|------|
 | `id` | Identifiant unique (référencé dans `config.plugins`). |
 | `name`, `version` | Métadonnées. |
-| `dependencies?` | Autres plugins requis (ordre d'init). |
-| `capabilities?` | Ce que le plugin fournit/consomme (déclaratif). |
+| `requiredCapabilities?` | Capacités que le plugin **exige** du runtime (voir §10.6bis). |
+| `optionalCapabilities?` | Capacités **facultatives** (dégradation gracieuse si absentes). |
+| `orderAfter?` | **Dépendances d'ordre d'initialisation** : ids de plugins à initialiser avant celui-ci. **N'ouvre aucun accès** à leurs API internes (voir §10.6bis). |
+| `incompatibleWith?` | **Incompatibilités explicites** : ids de plugins avec lesquels celui-ci ne peut coexister. |
+| `providesCapabilities?` | Capacités que le plugin **fournit** au runtime. |
 | **Hooks de cycle de vie** | `register`, `init`, `start`, `stop`, `dispose`. |
+
+> **v2 (N1 tranché)** : le champ générique `dependencies?` de la v1 est **remplacé** par ces déclarations précises. Un plugin ne déclare jamais une « dépendance » ouvrant l'accès à un autre plugin ; il déclare une **capacité**, un **ordre**, ou une **incompatibilité** (§10.6bis).
 
 > Le plugin ne manipule **jamais** les internes du moteur directement. Il reçoit un **contexte d'API** (Plugin Context) restreint et stable, fourni par le Plugin Manager.
 
@@ -112,8 +117,10 @@ graph LR
     D --> E[register → init → start dans l'ordre]
 ```
 
-- Le Plugin Manager résout les **dépendances** et applique un **tri topologique** pour l'ordre d'init.
-- Une dépendance manquante → le plugin est désactivé avec un avertissement clair (pas de plantage).
+- Le Plugin Manager résout les **capacités** et les **dépendances d'ordre** (`orderAfter`), puis applique un **tri topologique** pour l'ordre d'init.
+- Le **graphe des dépendances d'ordre DOIT rester acyclique (DAG)** : un cycle entre `orderAfter` est **rejeté** au démarrage avec une erreur claire (aucun plugin du cycle n'est initialisé). *(Règle de validation N1.)*
+- Une **capacité requise** manquante → le plugin est désactivé proprement avec un avertissement (pas de plantage) ; une **capacité optionnelle** manquante → dégradation gracieuse.
+- Une **incompatibilité** (`incompatibleWith`) détectée → l'un des plugins en conflit est désactivé avec un diagnostic explicite.
 
 ### 10.5.3 Isolation des erreurs
 
@@ -133,9 +140,34 @@ Le mode de communication **privilégié** est l'**Event Bus** (découplage). Deu
 |-----------|-----------|---------|
 | **Moteur → plugin** | Le plugin **écoute** des événements. | Sur `hotspot:activated`, un plugin d'analytics enregistre l'action. |
 | **Plugin → moteur** | Le plugin **émet** des événements ou appelle l'API du contexte. | Un plugin de visite guidée appelle `focus`/`goToState`. |
-| **Plugin → plugin** | Via l'Event Bus (espaces de noms) ou dépendances déclarées. | Un plugin d'annotations émet `annotation:created`. |
+| **Plugin → plugin** | **Exclusivement** via le **catalogue d'événements typé**, les **capacités déclarées** ou les **ports/contrats publics** du moteur — **jamais** par import/appel direct. | Un plugin d'annotations émet `annotation:created` ; un autre l'écoute. |
 
 **Points d'extension UI** : le contexte offre des « slots » où un plugin peut injecter des éléments (bouton de toolbar, entrée de menu, panneau) sans connaître l'implémentation de l'UI Manager.
+
+---
+
+## 10.6bis Gouvernance des dépendances entre plugins (N1 — définitif)
+
+> **Règle définitive** : un plugin **NE DOIT JAMAIS importer, appeler directement, ni dépendre** des classes, fonctions, fichiers ou détails internes d'un autre plugin. Il **PEUT** en revanche déclarer, de façon purement déclarative : une **capacité requise**, une **dépendance d'ordre d'initialisation**, une **incompatibilité explicite**, une **capacité optionnelle** (dégradation gracieuse). **Toute** communication inter-plugins passe **exclusivement** par les contrats publics du moteur, le **catalogue d'événements typé**, les **capacités déclarées** ou les **ports officiellement exposés**. Cette règle empêche tout **couplage d'implémentation** entre plugins sans interdire l'**orchestration déclarative** nécessaire au runtime.
+
+### Définitions
+
+| Notion | Définition |
+|--------|------------|
+| **Dépendance d'implémentation** | Lien où un plugin importe/appelle/référence le **code ou les internes** d'un autre plugin (classe, fonction, fichier, état privé). **INTERDITE** — c'est le couplage que la règle proscrit. |
+| **Dépendance de capacité** | Déclaration qu'un plugin **requiert une capacité** (ex. `"scenario"`, `"measure"`) fournie *par le runtime* (pas par un plugin nommé). Le runtime la satisfait via un plugin fournisseur, interchangeable. **Autorisée.** |
+| **Dépendance d'ordre** | Déclaration (`orderAfter`) qu'un plugin doit être **initialisé après** un autre, pour l'ordonnancement du cycle de vie **uniquement**. Elle **n'accorde AUCUN accès** aux API internes du plugin référencé. **Autorisée.** |
+| **Capacité optionnelle** | Capacité que le plugin **exploite si présente**, mais dont l'absence n'empêche pas son fonctionnement (comportement réduit). **Autorisée.** |
+| **Dégradation gracieuse** | Comportement par lequel, en l'absence d'une capacité optionnelle (ou d'une capacité requise, au niveau package), la fonctionnalité concernée est **désactivée proprement** avec diagnostic, **sans** écran noir ni plantage. |
+
+### Règles normatives (N1)
+
+1. **Aucun couplage d'implémentation** : pas d'import/appel/référence des internes d'un autre plugin (dépendance d'implémentation interdite).
+2. **Orchestration déclarative autorisée** : capacité requise, dépendance d'ordre, incompatibilité explicite, capacité optionnelle.
+3. **Communication canalisée** : uniquement via événements typés, capacités déclarées, ou ports/contrats publics.
+4. **Ordre sans accès** : une dépendance d'ordre (`orderAfter`) **n'ouvre aucun accès** aux API internes du plugin référencé ; elle ne sert qu'à séquencer l'initialisation.
+5. **Graphe d'ordre acyclique** : l'ensemble des `orderAfter` **DOIT former un DAG** ; tout cycle est **rejeté** au démarrage (diagnostic clair).
+6. **Capacités, pas plugins nommés** : une dépendance fonctionnelle se déclare par **capacité** (satisfaite par le runtime), non par référence à un plugin concret — ce qui préserve l'interchangeabilité et le découplage.
 
 ---
 
@@ -210,4 +242,5 @@ Le mode de communication **privilégié** est l'**Event Bus** (découplage). Deu
 3. Un package **active/configure** des plugins **enregistrés** ; il n'apporte pas leur code (sécurité).
 4. Les erreurs de plugins sont **isolées** ; un plugin défaillant est désactivé proprement.
 5. Le cycle de vie (`register→init→start→stop→dispose`) est respecté ; `dispose` **libère tout**.
-6. La communication privilégiée est l'**Event Bus** avec espaces de noms.
+6. La communication privilégiée est l'**Event Bus** typé avec espaces de noms.
+7. **Découplage inter-plugins (N1, §10.6bis)** : aucun import/appel/dépendance d'implémentation entre plugins ; seules sont autorisées les déclarations de **capacité requise/optionnelle**, de **dépendance d'ordre** et d'**incompatibilité**. Le graphe des dépendances d'ordre **DOIT rester acyclique**, et une dépendance d'ordre **ne donne aucun accès** aux API internes du plugin référencé.

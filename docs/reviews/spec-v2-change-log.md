@@ -115,7 +115,15 @@
 
 ---
 
-## 3. Arbitrages restant ouverts (à trancher avant P0 ou tôt en P0)
+## 3. Arbitrages
+
+### 3.0 Arbitrages tranchés (fermés)
+
+| Réf | Question | Décision définitive | Documents |
+|-----|----------|---------------------|-----------|
+| **N1** | Dépendances entre plugins : couplage vs orchestration déclarative | **FERMÉ (tranché par le mainteneur).** Aucune **dépendance d'implémentation** entre plugins (import/appel/référence des internes **interdit**). Autorisé et **déclaratif uniquement** : capacité requise, dépendance d'ordre d'initialisation (`orderAfter`), incompatibilité explicite, capacité optionnelle (dégradation gracieuse). Communication inter-plugins **exclusivement** via contrats publics / catalogue d'événements typé / capacités déclarées / ports officiels. Une dépendance d'ordre **n'ouvre aucun accès** aux internes ; le **graphe d'ordre DOIT rester acyclique**. | `ENGINE_CONSTITUTION.md` (L15) · `docs/10-plugins.md` (§10.2, §10.5.2, §10.6, **§10.6bis**, §10.9) · `CONTRIBUTING.md` (§4.5) · `docs/CODE_REVIEW_CHECKLIST.md` (§5) · ADR-006 (cohérent) |
+
+### 3.1 Arbitrages restant ouverts (à trancher tôt en P0)
 
 | Réf | Question ouverte | Options | Recommandation provisoire |
 |-----|------------------|---------|---------------------------|

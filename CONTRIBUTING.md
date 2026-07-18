@@ -55,10 +55,10 @@ Rappels des invariants les plus fréquemment concernés (voir [Constitution](./E
 Un plugin ajoute une capacité **sans modifier le noyau** ([chapitre 10](./docs/10-plugins.md)).
 
 1. **Squelette** : un dossier sous `packages/plugins/<mon-plugin>/`, dépendant **uniquement** du `@explorer-engine/plugin-sdk` (jamais des internes du core).
-2. **Contrat** : exporter un objet conforme au contrat de plugin (`id`, `version`, hooks `register/init/start/stop/dispose`, `dependencies?`, `capabilities?`).
+2. **Contrat** : exporter un objet conforme au contrat de plugin (`id`, `version`, hooks `register/init/start/stop/dispose`, `requiredCapabilities?`, `optionalCapabilities?`, `providesCapabilities?`, `orderAfter?`, `incompatibleWith?`).
 3. **Cycle de vie** : tout ce qui est alloué dans `init`/`start` est libéré dans `dispose` (aucun listener/DOM/ressource orphelin).
 4. **Communication** : via l'**Event Bus typé** (espace de nom propre, ex. `measure:*`) et le **Plugin Context**. Pour toute contribution visuelle, utiliser **`addLayer`** (plage de priorité plugin), **jamais** de mutation directe.
-5. **Découplage** : ne **jamais** importer le code d'un autre plugin (L15). Une dépendance d'ordre se **déclare** ; l'interaction passe par événements.
+5. **Découplage inter-plugins (L15 / ch.10 §10.6bis)** : un plugin **NE DOIT JAMAIS importer, appeler directement, ni dépendre** des classes, fonctions, fichiers ou internes d'un autre plugin (**dépendance d'implémentation interdite**). Il PEUT déclarer une **capacité requise/optionnelle**, une **dépendance d'ordre** (`orderAfter`) ou une **incompatibilité**. Toute interaction inter-plugins passe **exclusivement** par le catalogue d'événements typé, les capacités déclarées ou les ports publics. Une dépendance d'ordre **ne donne aucun accès** aux internes du plugin référencé ; le graphe d'ordre **doit rester acyclique**. Préférer une **dépendance de capacité** (satisfaite par le runtime) à toute référence à un plugin nommé.
 6. **UI** : fournir des **descripteurs** via les slots du `UiPort` (pas de JSX, pas de framework imposé).
 7. **Capacité** : si le plugin fournit une capacité (`scenario`, `measure`…), la déclarer pour que les packages puissent l'exiger via `requiredCapabilities`.
 8. **Robustesse** : capter ses propres erreurs ; ne jamais faire planter le moteur.

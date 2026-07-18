@@ -64,7 +64,9 @@
 - [ ] Frontières nettes ; **faible couplage**, forte cohésion.
 - [ ] **Injection de dépendances** (pas d'instanciation en dur des dépendances lourdes) → testable.
 - [ ] Substituabilité : les stratégies (occlusion, easing, backend) respectent leur contrat.
-- [ ] **Plugins** : dépendent du `plugin-sdk` uniquement ; **découplés** entre eux (L15) ; contribuent via couches ; UI via descripteurs ; `dispose` complet ; erreurs isolées (L16/L17).
+- [ ] **Plugins** : dépendent du `plugin-sdk` uniquement ; contribuent via couches ; UI via descripteurs ; `dispose` complet ; erreurs isolées (L16/L17).
+- [ ] **Découplage inter-plugins (L15 / ch.10 §10.6bis)** : AUCUN `import`, appel direct ou référence aux internes d'un autre plugin (dépendance d'implémentation). Seules déclarations tolérées : capacité requise/optionnelle, `orderAfter`, incompatibilité. Communication uniquement via événements typés / capacités / ports publics.
+- [ ] **Dépendances d'ordre** : `orderAfter` n'ouvre aucun accès aux internes du plugin cité ; le **graphe d'ordre est acyclique** (aucun cycle `orderAfter`).
 - [ ] Nommage clair et conforme ; pas de duplication évitable ; complexité maîtrisée.
 - [ ] **Événements typés** ; aucune donnée par frame sur le bus (L11).
 

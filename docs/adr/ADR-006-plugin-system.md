@@ -27,7 +27,7 @@ Comment ajouter des fonctionnalités **sans complexifier ni patcher le noyau** (
 
 - Un plugin dépend **uniquement** du `plugin-sdk` (jamais des internes du core).
 - Communication via le **Plugin Context** (façade) et l'**Event Bus typé** ; contributions visuelles via **`addLayer`** au Render State Resolver (jamais de mutation directe — C1).
-- **Découplage inter-plugins** : un plugin ne dépend jamais de l'implémentation d'un autre. Une **dépendance d'ordre/capacité** peut être déclarée (résolue par tri topologique du Plugin Manager), mais l'interaction passe par événements. *(Constitution L15)*
+- **Découplage inter-plugins (N1, définitif)** : aucune **dépendance d'implémentation** (import/appel/référence des internes d'un autre plugin). Seules déclarations autorisées, purement déclaratives : **capacité requise**, **dépendance d'ordre** (`orderAfter`), **incompatibilité explicite**, **capacité optionnelle**. Une dépendance d'ordre **n'ouvre aucun accès** aux internes et le **graphe d'ordre reste acyclique** ; toute communication passe par le catalogue d'événements typé / capacités déclarées / ports publics. *(Constitution L15 ; [ch.10 §10.6bis](../10-plugins.md).)*
 - **Sécurité** : un package **active/configure** des plugins **enregistrés côté hôte** ; il n'apporte pas leur code.
 - **Portabilité (C8)** : un package déclare `requiredCapabilities` ; un **runtime de référence** garantit un jeu de plugins standard ; une capacité absente → **dégradation gracieuse**. Le package est « portable sur tout runtime conforme au profil de capacités déclaré ».
 - **Isolation des erreurs** : un plugin défaillant est désactivé proprement, sans casser le moteur ; il libère tout dans `dispose`.
