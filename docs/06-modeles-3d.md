@@ -60,18 +60,25 @@ Les décodeurs sont des ressources **partagées** (singletons) gérées par le m
 Selon la config `model` (chapitre 05) :
 
 - **Échelle** (`scale`), **axe up** (`up`), **recentrage** (`center`).
-- Calcul de la **bounding box / sphere** globale (sert au cadrage caméra, aux plans near/far, au sol).
+- **Normalisation vers un volume unité (v2, C15)** : par défaut (`model.normalizeToUnit`), le modèle est ramené dans un volume unité (mise à l'échelle par la plus grande dimension de la bounding box). Cela **stabilise la précision de profondeur** sur une plage d'échelles extrême (montre en mm ↔ fusée en dizaines de m) et permet des near/far cohérents.
+- Calcul de la **bounding box / sphere** globale ; **near/far dérivés** de ces bornes.
+- Option **`model.depthLog`** : buffer de profondeur **logarithmique** pour les objets à grande dynamique interne (capacité `"depth-log"`).
 - Vérification/ajustement du **color space** des textures (couleurs en sRGB, données techniques — normal/roughness/metalness — en linéaire).
+
+> **Rest pose canonique (C1)** : l'état géométrique/matériau du modèle **après** cette normalisation constitue la **rest pose** de référence du Render State Resolver (chapitre 19). Toutes les couches `transform` sont des offsets absolus depuis cette rest pose.
 
 ---
 
-## 6.3 Indexation des nœuds
+## 6.3 Indexation des composants (identité stable — v2, C5)
 
-Étape critique pour la généricité : le moteur construit un **index** `nom de nœud → objet 3D`. Cet index est la **colonne vertébrale** des hotspots, du focus, de la sélection et des états — tous référencent des composants par le nom de leurs nœuds (chapitre 05, `components`).
+Étape critique pour la généricité : le moteur construit un **index** `identité stable → objet 3D`. Cet index est la **colonne vertébrale** des hotspots, du focus, de la sélection et des états.
 
-- Les noms proviennent de la structure du GLB (définie par le créateur dans son outil 3D).
-- Le moteur DEVRAIT tolérer les collisions de noms (plusieurs nœuds homonymes) en indexant en listes.
-- Recommandation de package : **nommer proprement** les nœuds (convention documentée), car c'est le pont entre le modèle et la config.
+- **Clé primaire : `extras.explorerId`** — une propriété custom glTF (`node.extras.explorerId`) posée à la préparation du package (outil `optimize-model`). Elle **survit au ré-export** et à la compression (gltfpack/Draco), contrairement aux noms de nœuds.
+- **Repli : nom de nœud** — si un composant référence un nœud par `name` (faute d'`explorerId`), l'index le résout **mais l'outil de validation émet un avertissement** (fragile : un ré-export peut renommer/fusionner les nœuds).
+- Le moteur tolère les **collisions** (homonymes / ids multiples) en indexant en listes.
+- **Recommandation de package** : poser des `explorerId` **stables** sur tous les nœuds adressés par la config ; ne jamais dépendre des noms pour la production.
+
+> Ce changement corrige le défaut v1 F7 : l'ancienne identité par nom cassait silencieusement au moindre ré-export. L'`explorerId` fait de l'identité un **contrat du pipeline d'assets**.
 
 ---
 
@@ -83,16 +90,16 @@ Le moteur s'appuie sur le **PBR metallic-roughness** de glTF (couleur de base, m
 
 ### 6.4.2 Surcharges par la config
 
-Les états et le focus peuvent **surcharger** temporairement des propriétés matérielles **sans altérer** le matériau d'origine :
+Les états et le focus n'altèrent **jamais** le matériau d'origine : ils **publient des couches** au Render State Resolver (chapitre 19), qui compose et applique l'effectif via l'adaptateur de rendu :
 
-| Surcharge | Usage |
-|-----------|-------|
-| `opacity` / `transparent` | États `Transparent`, `X-ray`, dimming du focus. |
-| `wireframe` | Vue technique. |
-| `color` / `emissive` | Surbrillance (hover, sélection). |
-| `outline` | Contour de mise en valeur (post-processing, pas une prop matériau au sens strict). |
+| Canal de couche | Usage |
+|-----------------|-------|
+| `opacity` | États `Transparent`, `X-ray`, dimming du focus (composition **min**). |
+| `colorOverride` | Surbrillance (hover, sélection). |
+| `visibility` | Isolation du focus. |
+| `outline` | Contour de mise en valeur (post-processing). |
 
-**Règle** : toute surcharge est **réversible**. Le moteur conserve l'état d'origine et le restaure (retour d'état/focus). Les surcharges DEVRAIENT réutiliser/cloner les matériaux avec parcimonie pour éviter l'explosion mémoire (voir 6.8).
+**Règle (v2)** : la réversibilité est **garantie par construction** — retirer une couche recompose l'effectif ; le moteur ne « sauvegarde/restaure » plus rien (fin du modèle impératif v1). L'adaptateur de rendu gère les matériaux effectifs avec parcimonie (partage/instanciation) pour éviter l'explosion mémoire (voir 6.8).
 
 ### 6.4.3 Gestion de la transparence
 

@@ -20,23 +20,26 @@
 
 ```jsonc
 {
-  "schemaVersion": "1.0",        // OBLIGATOIRE — version du schéma
+  "schemaVersion": "1.0",        // OBLIGATOIRE — version du schéma (politique de compat: §5.3.1)
+  "requiredCapabilities": [ ... ],// v2 (C8) — capacités attendues du runtime (dégradation si absentes)
   "meta": { ... },               // métadonnées (nom, description, langue par défaut)
   "model": { ... },              // OBLIGATOIRE — le modèle 3D et ses options de chargement
   "environment": { ... },        // arrière-plan, environment map
   "lighting": { ... },           // éclairage
   "camera": { ... },             // caméra, contrôles, vues nommées
-  "components": [ ... ],         // mapping logique des nœuds du GLB (granularité, groupes)
-  "hotspots": [ ... ],           // points d'intérêt
-  "states": [ ... ],             // états macroscopiques et transitions
-  "focus": { ... },              // réglages globaux du Focus System
+  "components": [ ... ],         // mapping logique (explorerId → composant) + granularité + groupes
+  "hotspots": [ ... ],           // points d'intérêt (adressage typé)
+  "states": [ ... ],             // états macroscopiques (couches, transforms ABSOLUS)
+  "focus": { ... },              // réglages globaux du mécanisme de Focus
   "ui": { ... },                 // panneaux, toolbar, breadcrumb, loaders
   "theme": { ... },              // design tokens (ou référence à un thème)
-  "animations": { ... },         // clips nommés, timelines déclaratives
+  "animations": { ... },         // clips nommés + autoplay (v2: PLUS de DSL de scénario — cf. C12)
   "plugins": [ ... ],            // plugins activés + leur configuration
   "i18n": { ... }                // langues disponibles, fichiers de traduction
 }
 ```
+
+> **Références externes (`$ref`, v2/C17)** : toute section volumineuse (`hotspots`, `ui.panels`, `i18n.sources`) PEUT être extraite dans un fichier séparé et référencée : `"hotspots": { "$ref": "hotspots.json" }`. Le Config Loader résout les `$ref` (relatifs au package) à la validation. `config.json` reste le **manifeste**.
 
 ### 5.2.1 Table de synthèse des sections
 
@@ -62,11 +65,30 @@
 
 ## 5.3 Détail des sections
 
-### 5.3.1 `schemaVersion`
+### 5.3.1 `schemaVersion` et politique de compatibilité (v2, C14)
 
 | Propriété | Type | Défaut | Description |
 |-----------|------|--------|-------------|
-| `schemaVersion` | `string` (semver `"MAJEUR.MINEUR"`) | — (obligatoire) | Version du schéma que ce package cible. Détermine compatibilité et migration (chapitre 04). |
+| `schemaVersion` | `string` (semver `"MAJEUR.MINEUR"`) | — (obligatoire) | Version du schéma que ce package cible. |
+
+**Politique de compatibilité (normative)** :
+
+| Cas | Comportement moteur |
+|-----|---------------------|
+| Package **même majeure, mineure ≤** celle du moteur | Chargé normalement (défauts appliqués aux champs récents absents). |
+| Package **même majeure, mineure >** celle du moteur (package plus récent) | **Forward-compat tolérante** : chargé ; les **champs inconnus sont ignorés avec avertissement** (jamais de rejet). L'expérience fonctionne en mode dégradé sur les nouveautés non comprises. |
+| Package **majeure antérieure** | **Migration montante** déterministe (chapitre 04) vers la majeure du moteur. |
+| Package **majeure postérieure** | **Rejet propre** + message pointant la doc de migration/mise à jour du runtime. |
+
+**Matrice de compatibilité** : le dépôt publie une matrice `core ↔ schema ↔ sdk` (dans `packages/schema`) indiquant, pour chaque version de `core`, les majeures de schéma supportées et la version de `plugin-sdk` compatible. Politique semver stricte : ajout de champ optionnel = mineure ; changement de sémantique/suppression = majeure.
+
+### 5.3.1bis `requiredCapabilities` (v2, C8)
+
+| Propriété | Type | Défaut | Description |
+|-----------|------|--------|-------------|
+| `requiredCapabilities` | `Capability[]` | `[]` | Capacités attendues du runtime. Chaque entrée : `{ id: string, level?: "required" \| "optional" }`. Une capacité `required` absente → fonctionnalité désactivée + diagnostic (pas d'échec global) ; `optional` absente → ignorée. |
+
+Exemples de capacités : `"scenario"` (visites), `"measure"`, `"annotations"`, `"spatial-audio"`, `"depth-log"` (buffer de profondeur logarithmique). Le mapping capacité → plugin/feature est assuré par le **runtime de référence** (chapitre 10).
 
 ### 5.3.2 `meta`
 
@@ -90,6 +112,8 @@
 | `up` | `"y" \| "z"` | `"y"` | Axe « haut » du modèle (normalisation d'orientation). |
 | `center` | `boolean` | `true` | Recentrer le modèle sur l'origine. |
 | `frameOnLoad` | `boolean` | `true` | Cadrer automatiquement la caméra sur le modèle au chargement. |
+| `normalizeToUnit` | `boolean` | `true` | **v2 (C15)** — Normaliser le modèle dans un **volume unité** au chargement (précision de profondeur ; near/far dérivés). |
+| `depthLog` | `boolean` | `false` | **v2 (C15)** — Activer un **buffer de profondeur logarithmique** (objets à grande dynamique interne : montre ↔ fusée). Capacité `"depth-log"`. |
 | `lod` | `object` | voir 06 | Options LOD (voir chapitre 06). |
 
 ### 5.3.4 `environment`
@@ -128,21 +152,25 @@ Chaque `Light` : `{ type: "directional"|"ambient"|"point"|"spot"|"hemisphere", c
 
 `View` : `{ id, label?, position: [x,y,z], target: [x,y,z], fov? }`.
 
-### 5.3.7 `components`
+### 5.3.7 `components` (v2 : identité stable + adressage typé)
 
-Décrit la **granularité logique** et les **groupes** utilisés par la sélection, le focus et les états. Sert à mapper les noms de nœuds du GLB vers des entités compréhensibles.
+Décrit la **granularité logique** et les **groupes** utilisés par la sélection, le focus et les états. Un composant mappe des **nœuds du modèle** vers une entité logique.
+
+**Identité stable (C5)** : un composant référence ses nœuds **prioritairement par `explorerId`** (propriété `extras.explorerId` posée dans le GLB à la préparation — chapitre 06). Le **nom de nœud** n'est qu'un **repli** : s'il est utilisé, l'outil de validation émet un **avertissement** (fragile au ré-export). C'est le **seul** endroit du schéma où des nœuds bruts sont référencés — partout ailleurs on adresse des **composants/groupes**.
 
 `Component` :
 
 | Propriété | Type | Défaut | Description |
 |-----------|------|--------|-------------|
-| `id` | `string` | — | Identifiant logique unique. |
-| `label` | `string \| i18nKey` | `id` | Nom lisible. |
-| `nodes` | `string[]` | — | Noms de nœuds GLB rattachés à ce composant. |
+| `id` | `string` | — | Identifiant logique unique du composant. |
+| `label` | `string \| I18nText` | `id` | Nom lisible. |
+| `nodes` | `NodeRef[]` | — | Nœuds rattachés. `NodeRef = { explorerId: string }` (**recommandé**) ou `{ name: string }` (**repli, warning**). |
 | `selectable` | `boolean` | `true` | Peut être sélectionné (picking). |
-| `pickTarget` | `string` (id) | `self` | Si cliqué, sélectionner ce composant (regroupement de granularité). |
+| `pickTarget` | `string` (id de composant) | `self` | Regroupement de granularité au clic. |
 | `group` | `string` | `null` | Groupe logique (ex. `"internals"`) pour les états. |
 | `info` | `object` | `null` | Contenu par défaut du panneau (voir `ui`). |
+
+**Adressage typé (`Address`, C5)** — utilisé par hotspots/états/focus/plugins : `{ kind: "component" | "group" | "node", id: string }`. Le préfixe de chaîne `"group:internals"` de la v1 est **supprimé** au profit de `{ kind: "group", id: "internals" }`.
 
 ### 5.3.8 `hotspots`
 
@@ -153,16 +181,16 @@ Décrit la **granularité logique** et les **groupes** utilisés par la sélecti
 | Propriété | Type | Défaut | Description |
 |-----------|------|--------|-------------|
 | `id` | `string` | — | Identifiant unique. |
-| `anchor` | `{ node: string } \| { position: [x,y,z] } \| { component: string }` | — | Point d'ancrage 3D. |
-| `label` | `string \| i18nKey` | `""` | Libellé/tooltip. |
+| `anchor` | `{ component: id } \| { group: id } \| { node: { explorerId } } \| { position: [x,y,z] }` | — | Ancrage typé (v2, C5) — `component`/`group` recommandés. |
+| `label` | `string \| I18nText` | `""` | Libellé/tooltip. |
 | `icon` | `string` (chemin/preset) | défaut | Icône du marqueur. |
 | `content` | `PanelContentRef` | `null` | Contenu affiché à l'activation. |
 | `action` | `HotspotAction` | `focus` | Comportement à l'activation (voir 07). |
 | `visibleInStates` | `string[]` | tous | États dans lesquels le hotspot est visible. |
-| `occludable` | `boolean` | `true` | Masquer si occulté par la géométrie. |
+| `occludable` | `boolean` | `true` | Masquer si occulté (occlusion BVH, sans readback — chapitre 07/C13). |
 | `priority` | `number` | `0` | Résolution des chevauchements (clustering). |
 
-`HotspotAction` (union) : `{ type: "focus", target }` | `{ type: "openPanel", panel }` | `{ type: "goToState", state }` | `{ type: "playAnimation", clip }` | `{ type: "emit", event }` (déclenche un événement consommable par un plugin).
+`HotspotAction` (union) : `{ type: "focus", target: Address }` | `{ type: "openPanel", panel }` | `{ type: "goToState", state }` | `{ type: "setModifier", modifier, on }` | `{ type: "playClip", clip }` | `{ type: "emit", event }` (événement **typé** consommable par un plugin). *(`playAnimation` de v1 devient `playClip` — plus de scénario ici, cf. C12.)*
 
 ### 5.3.9 `states`
 
@@ -173,16 +201,18 @@ Décrit la **granularité logique** et les **groupes** utilisés par la sélecti
 | Propriété | Type | Défaut | Description |
 |-----------|------|--------|-------------|
 | `id` | `string` | — | Identifiant (ex. `"closed"`, `"exploded"`). |
-| `label` | `string \| i18nKey` | `id` | Nom affiché. |
-| `type` | `"base" \| "modifier"` | `"base"` | `base` = exclusif ; `modifier` = combinable (ex. transparence). |
-| `transforms` | `Transform[]` | `[]` | Transformations appliquées aux composants/groupes. |
-| `material` | `MaterialOverride[]` | `[]` | Surcharges de matériau (opacité, wireframe, couleur). |
-| `camera` | `string` (id de vue) \| inline | `null` | Vue caméra associée. |
-| `lighting` | `string` (preset) | `null` | Éclairage associé. |
+| `label` | `string \| I18nText` | `id` | Nom affiché. |
+| `region` | `"base" \| <modifierRegionId>` | `"base"` | **v2 (C11)** — `base` = région principale (exclusif) ; sinon région parallèle (modifier). |
+| `layers` | `Layer[]` | `[]` | **v2 (C1)** — couches publiées au resolver (voir ci-dessous). |
+| `cameraIntent` | `string` (id de vue) \| inline | `null` | Couche `cameraIntent` (priorité `state`). |
+| `lightingIntent` | `string` (preset) | `null` | Couche `lightingIntent`. |
+| `excludes` | `string[]` | `[]` | **v2 (C11)** — modifiers/régions mutuellement exclusifs. |
 | `transition` | `TransitionSpec` | défaut global | Durée/easing de la transition entrante. |
-| `allowedFrom` | `string[]` | tous | Restriction de la machine à états. |
+| `allowedFrom` | `string[]` | tous | Restriction de la région principale (bases). |
 
-`Transform` : `{ target: componentId|group, translate?: [x,y,z], rotate?, scale?, relative?: bool }`.
+`Layer` (v2, remplace `transforms` + `material`) : `{ target: Address, channel: "transform"|"opacity"|"colorOverride"|"visibility", value }`.
+- `transform.value` = **offset ABSOLU depuis la rest pose** : `{ translate?, rotate?, scale? }`. **Le flag `relative` est supprimé** (chapitre 19 §19.3.3).
+- `opacity.value` ∈ `[0,1]` ; `visibility.value` ∈ `"visible"|"hidden"` ; `colorOverride.value` = `{ color, intensity }`.
 
 ### 5.3.10 `focus`
 
@@ -196,7 +226,8 @@ Réglages globaux du Focus System (surchargeables par hotspot/composant). Voir [
 | `outline` | `boolean \| { color, thickness }` | `true` | Contour de mise en valeur. |
 | `isolate` | `boolean` | `false` | Masquer complètement le reste. |
 | `transition` | `TransitionSpec` | `{ duration: 600, easing: "easeInOut" }` | Animation du focus. |
-| `restoreOnExit` | `boolean` | `true` | Revenir à la vue précédente à la sortie. |
+
+> **v2 (C1/C4)** : `restoreOnExit` est **supprimé**. Le retour de focus est intrinsèque au **retrait des couches** publiées (chapitre 08/19) — il n'y a plus rien à « restaurer ».
 
 ### 5.3.11 `ui`
 
@@ -230,8 +261,9 @@ Réglages globaux du Focus System (surchargeables par hotspot/composant). Voir [
 | Propriété | Type | Défaut | Description |
 |-----------|------|--------|-------------|
 | `clips` | `ClipRef[]` | auto (depuis GLB) | Déclaration/nommage des clips du GLB ou externes. |
-| `timelines` | `Timeline[]` | `[]` | Séquences déclaratives orchestrant animations/caméra/états. |
-| `autoplay` | `string` (id) | `null` | Timeline/clip joué au démarrage (ex. rotation d'inactivité). |
+| `autoplay` | `{ clip: id, loop?: bool }` | `null` | **Clip simple** joué au démarrage (ex. ventilateur, rotation d'inactivité). |
+
+> **v2 (C12)** : le champ **`timelines` (DSL de scénario) est supprimé** du schéma. Le noyau d'animation ne fait qu'**interpoler** et **enchaîner des animations atomiques** ; toute **séquence/scénario** (visite, présentation) relève du **plugin `guided-tour`** (capacité `"scenario"`), au-dessus de l'Animation Engine. Voir [chapitre 11](./11-animation-engine.md) et [chapitre 10](./10-plugins.md).
 
 ### 5.3.14 `plugins`
 
@@ -246,7 +278,7 @@ Réglages globaux du Focus System (surchargeables par hotspot/composant). Voir [
 | `locales` | `string[]` | `[meta.defaultLocale]` | Langues disponibles. |
 | `sources` | `Record<locale, path>` | `{}` | Fichiers de traduction (`locales/*.json`). |
 
-Toute chaîne affichable (`label`, `title`, `content`…) PEUT être soit un texte littéral, soit une **clé i18n** (résolue via les `sources`).
+Toute chaîne affichable (`label`, `title`, `content`…) est de type **`I18nText`** : soit un **littéral** (`"Couronne"`), soit un objet **clé typé** `{ "$t": "watch.crown" }` résolu via les `sources`. **v2 (C17)** : l'heuristique de préfixe `"@clé"` de la v1 est **supprimée** (ambiguë) au profit de la forme explicite `{ "$t": ... }`.
 
 ---
 
@@ -256,10 +288,14 @@ Toute chaîne affichable (`label`, `title`, `content`…) PEUT être soit un tex
 |------|-------|-------|
 | `Color` | `"#RRGGBB"` \| `"#RRGGBBAA"` \| token | Chaînes hex ou référence à un token de thème. |
 | `Vec3` | `[number, number, number]` | Coordonnées/vecteurs. |
-| `i18nKey` | `string` préfixé (`"@key"`) | Résolu via i18n si le préfixe est présent. |
+| **`Address`** | `{ kind: "component" \| "group" \| "node", id }` | **v2 (C5)** — adressage typé unifié (remplace les préfixes de chaîne). |
+| **`NodeRef`** | `{ explorerId: string }` \| `{ name: string }` | **v2 (C5)** — `explorerId` recommandé ; `name` = repli avec warning. |
+| **`I18nText`** | `string` littéral \| `{ "$t": "clé" }` | **v2 (C17)** — clé i18n explicite (fin du préfixe `@`). |
+| **`Layer`** | `{ target: Address, channel, value }` | **v2 (C1)** — contribution au Render State Resolver (chapitre 19). |
 | `TransitionSpec` | `{ duration: ms, easing: EaseName, delay?: ms }` | Voir easings au chapitre 11. |
 | `EaseName` | `"linear" \| "easeIn" \| "easeOut" \| "easeInOut" \| ...` | Ensemble borné, validé. |
 | `PanelContentRef` | `string` (id de panel) \| inline `Panel` | Contenu d'un panneau. |
+| `$ref` | `{ "$ref": "fichier.json" }` | **v2 (C17)** — référence externe résolue par le Config Loader. |
 
 ---
 
@@ -293,21 +329,24 @@ Toute chaîne affichable (`label`, `title`, `content`…) PEUT être soit un tex
     "initialView": "front"
   },
   "components": [
-    { "id": "crown", "label": "Couronne", "nodes": ["Crown"] },
-    { "id": "movement", "label": "Mouvement", "nodes": ["Movement", "Balance", "Gears"] },
-    { "id": "case", "label": "Boîtier", "nodes": ["Case", "Glass"] }
+    { "id": "crown", "label": "Couronne", "nodes": [{ "explorerId": "crown" }] },
+    { "id": "movement", "label": "Mouvement",
+      "nodes": [{ "explorerId": "movement" }, { "explorerId": "balance" }, { "explorerId": "gears" }] },
+    { "id": "case", "label": "Boîtier", "nodes": [{ "explorerId": "case" }, { "explorerId": "glass" }] }
   ],
   "hotspots": [
     { "id": "hs-crown", "anchor": { "component": "crown" }, "label": "Couronne",
-      "action": { "type": "focus", "target": "crown" } },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "crown" } } },
     { "id": "hs-movement", "anchor": { "component": "movement" }, "label": "Mouvement",
       "action": { "type": "goToState", "state": "cutaway" }, "visibleInStates": ["closed"] }
   ],
   "states": [
-    { "id": "closed", "label": "Fermée", "type": "base" },
-    { "id": "cutaway", "label": "Vue en coupe", "type": "base",
-      "material": [{ "target": "case", "opacity": 0.15 }],
-      "camera": "movement",
+    { "id": "closed", "label": "Fermée", "region": "base" },
+    { "id": "cutaway", "label": "Vue en coupe", "region": "base",
+      "layers": [
+        { "target": { "kind": "component", "id": "case" }, "channel": "opacity", "value": 0.15 }
+      ],
+      "cameraIntent": "movement",
       "transition": { "duration": 800, "easing": "easeInOut" } }
   ],
   "ui": {
@@ -330,44 +369,49 @@ Toute chaîne affichable (`label`, `title`, `content`…) PEUT être soit un tex
   "schemaVersion": "1.0",
   "meta": { "title": "Gaming PC", "defaultLocale": "fr" },
   "model": { "src": "models/gaming-pc.glb", "draco": true, "ktx2": true },
+  "requiredCapabilities": [
+    { "id": "scenario", "level": "optional" },
+    { "id": "measure", "level": "optional" }
+  ],
   "components": [
-    { "id": "case-panel", "label": "Panneau latéral", "nodes": ["SidePanel"], "group": "shell" },
-    { "id": "gpu", "label": "Carte graphique", "nodes": ["GPU", "GPU_Fans"], "group": "internals",
+    { "id": "case-panel", "label": "Panneau latéral", "nodes": [{ "explorerId": "side_panel" }], "group": "shell" },
+    { "id": "gpu", "label": "Carte graphique",
+      "nodes": [{ "explorerId": "gpu" }, { "explorerId": "gpu_fans" }], "group": "internals",
       "info": { "panel": "p-gpu" } },
-    { "id": "cpu", "label": "Processeur", "nodes": ["CPU", "Cooler"], "group": "internals" },
-    { "id": "ram", "label": "Mémoire", "nodes": ["RAM_1", "RAM_2"], "group": "internals" }
+    { "id": "cpu", "label": "Processeur", "nodes": [{ "explorerId": "cpu" }, { "explorerId": "cooler" }], "group": "internals" },
+    { "id": "ram", "label": "Mémoire", "nodes": [{ "explorerId": "ram_1" }, { "explorerId": "ram_2" }], "group": "internals" }
   ],
   "states": [
-    { "id": "closed", "label": "Fermé", "type": "base" },
-    { "id": "open", "label": "Ouvert", "type": "base",
-      "transforms": [{ "target": "case-panel", "translate": [0.3, 0, 0], "relative": true }] },
-    { "id": "exploded", "label": "Éclaté", "type": "base", "allowedFrom": ["open"],
-      "transforms": [
-        { "target": "gpu", "translate": [0, -0.25, 0.3], "relative": true },
-        { "target": "cpu", "translate": [0, 0.25, 0.3], "relative": true },
-        { "target": "ram", "translate": [0, 0.1, 0.35], "relative": true }
+    { "id": "closed", "label": "Fermé", "region": "base" },
+    { "id": "open", "label": "Ouvert", "region": "base",
+      "layers": [
+        { "target": { "kind": "component", "id": "case-panel" },
+          "channel": "transform", "value": { "translate": [0.3, 0, 0] } }
+      ] },
+    { "id": "exploded", "label": "Éclaté", "region": "base", "allowedFrom": ["open"],
+      "layers": [
+        { "target": { "kind": "component", "id": "gpu" }, "channel": "transform", "value": { "translate": [0, -0.25, 0.3] } },
+        { "target": { "kind": "component", "id": "cpu" }, "channel": "transform", "value": { "translate": [0, 0.25, 0.3] } },
+        { "target": { "kind": "component", "id": "ram" }, "channel": "transform", "value": { "translate": [0, 0.1, 0.35] } }
       ],
       "transition": { "duration": 900, "easing": "easeInOut" } },
-    { "id": "xray", "label": "Rayons X", "type": "modifier",
-      "material": [{ "target": "group:shell", "opacity": 0.2 }] }
+    { "id": "xray", "label": "Rayons X", "region": "modifier-visibility",
+      "layers": [
+        { "target": { "kind": "group", "id": "shell" }, "channel": "opacity", "value": 0.2 }
+      ] }
   ],
   "hotspots": [
     { "id": "hs-gpu", "anchor": { "component": "gpu" }, "label": "GPU",
-      "action": { "type": "focus", "target": "gpu" }, "visibleInStates": ["open", "exploded"] }
+      "action": { "type": "focus", "target": { "kind": "component", "id": "gpu" } },
+      "visibleInStates": ["open", "exploded"] }
   ],
   "ui": {
     "toolbar": { "items": [
-      { "type": "stateToggle", "states": ["closed", "open", "exploded"] },
-      { "type": "stateToggle", "states": ["xray"] },
+      { "type": "stateToggle", "region": "base", "states": ["closed", "open", "exploded"] },
+      { "type": "modifierToggle", "modifier": "xray" },
       { "type": "resetView" }
     ] },
-    "panels": [
-      { "id": "p-gpu", "title": "Carte graphique",
-        "blocks": [
-          { "type": "image", "src": "assets/images/gpu.jpg" },
-          { "type": "specs", "value": { "VRAM": "16 Go", "TDP": "285 W" } }
-        ] }
-    ]
+    "panels": { "$ref": "panels.json" }
   },
   "plugins": [
     { "id": "guided-tour", "options": { "steps": ["hs-gpu", "cpu", "ram"], "autoStart": false } },
@@ -377,17 +421,22 @@ Toute chaîne affichable (`label`, `title`, `content`…) PEUT être soit un tex
 }
 ```
 
+> Notes v2 : transforms **absolus** depuis la rest pose (plus de `relative`) ; adressage `Address` typé ; `xray` est un **modifier** dans sa propre région parallèle (`region: "modifier-visibility"`) ; `panels` extrait via `$ref` ; `requiredCapabilities` déclare `scenario`/`measure` en `optional` (dégradation gracieuse si le runtime ne les fournit pas).
+
 ---
 
 ## 5.6 Règles de validation (normatives)
 
 1. `schemaVersion` et `model.src` sont **obligatoires**.
 2. Tous les `id` (composants, hotspots, états, vues, panels) sont **uniques** dans leur espace.
-3. Toute **référence** (`action.target`, `anchor.component`, `state.camera`, `visibleInStates`, `plugins[].id`…) DOIT pointer vers une entité existante ou un plugin enregistré ; sinon → erreur ciblée (le reste continue).
-4. Les `nodes` référencés DOIVENT exister dans le GLB (vérifié par l'outil `validate-package` et, à l'exécution, par le Model Loader).
-5. Les valeurs énumérées (`easing`, `type`, `preset`…) DOIVENT appartenir aux ensembles bornés du schéma.
+3. Toute **référence** (`action.target` typé, `anchor`, `cameraIntent`, `visibleInStates`, `plugins[].id`…) DOIT pointer vers une entité existante ou une capacité disponible ; sinon → erreur ciblée (le reste continue).
+4. Les `nodes` référencés DOIVENT exister dans le GLB : par **`explorerId`** (recommandé) ou par **`name`** (repli, **warning** de validation — C5).
+5. Les valeurs énumérées (`easing`, `channel`, `region`, `preset`…) DOIVENT appartenir aux ensembles bornés du schéma.
 6. Les nombres contraints (opacités ∈ [0,1], durées ≥ 0…) sont **bornés** ; hors bornes → clamp + warning.
-7. Le moteur applique les **défauts** documentés ici pour toute propriété absente.
+7. Les couches `transform` sont **absolues** (aucun `relative`) — une couche `relative` est **rejetée** (C1).
+8. Les modifiers en conflit sur un même `(target, channel)` DOIVENT déclarer `excludes` ou une priorité ; sinon warning (C11).
+9. Les `$ref` sont résolus **relativement au package** ; une cible hors package est rejetée (sécurité).
+10. Le moteur applique les **défauts** documentés ici pour toute propriété absente ; les **champs inconnus d'une mineure supérieure** sont ignorés avec warning (C14).
 
 ---
 
