@@ -37,20 +37,21 @@ Un plugin est un **objet conforme à un contrat** (interface) défini par le **`
 
 Le **Plugin Context** est la **façade** que le moteur expose aux plugins. Il est **stable** et **versionné** (compatibilité ascendante). Il donne accès de façon contrôlée à :
 
-| Domaine | Capacités offertes (exemples) |
-|---------|-------------------------------|
-| **Événements** | `on/off/once/emit` sur l'Event Bus (écouter et émettre). |
-| **Scène (lecture)** | Requêter des composants, bounding boxes, l'index des nœuds (lecture/annotation, pas de casse). |
-| **Caméra / Focus** | Demander un focus, une vue, une transition (via API haut niveau). |
-| **États** | Lire l'état courant, demander une transition. |
-| **Hotspots** | Créer/supprimer des hotspots dynamiques. |
-| **Animation** | Créer des tweens/timelines. |
-| **UI** | Enregistrer des éléments d'UI (bouton de toolbar, panneau, overlay) via des points d'extension. |
-| **Config** | Lire ses propres `options` (depuis `config.plugins[].options`) et la config globale (lecture). |
-| **Ressources** | Charger des assets via le Resource Manager (respect de la politique de chargement). |
+| Domaine | Capacités offertes (exemples) — v2 |
+|---------|-------------------------------------|
+| **Événements** | `on/off/once/emit` sur l'**Event Bus typé** (catalogue nom→payload, C9) ; un plugin déclare ses propres événements typés dans un espace de nom. |
+| **Scène (lecture)** | Requêter des composants, bounding boxes, l'index (clé **`explorerId`**, C5) — lecture seule. |
+| **État visuel** | **`addLayer` / removeLayer / updateLayer`** au Render State Resolver (chapitre 19), dans une **plage de priorité réservée aux plugins** (≥ 200). Un plugin **ne mute jamais** la scène directement (C1). |
+| **Focus / États** | Demander un focus (mécanisme), lire l'état courant, demander une transition (statechart). |
+| **Hotspots** | Créer/supprimer des hotspots dynamiques (logique). |
+| **Animation** | Créer des tweens ; acquérir un **frame handle** (`acquireFrameLoop`) s'il anime en continu (C7). |
+| **UI** | Fournir des **descripteurs d'UI** (bouton toolbar, panneau, overlay) via des **slots** du `UiPort` (C3) — **pas de JSX, pas de framework**. |
+| **Rendu** | Accès **indirect** via `RendererPort` (le core est headless) ; pas d'accès Three.js brut par défaut. |
+| **Config** | Lire ses `options` (`config.plugins[].options`) et la config globale (lecture). |
+| **Ressources** | Charger des assets via le Resource Manager (politique de chargement + **annulation** C16). |
 | **Diagnostics** | Logger dans l'espace de nom du plugin. |
 
-> Le contexte **n'expose pas** les objets internes bruts (renderer, scène Three.js…) par défaut. Un accès « bas niveau » PEUT être fourni via une capacité explicitement demandée et documentée, pour les plugins avancés — mais il est à utiliser avec précaution (risque de couplage).
+> Le contexte **n'expose pas** les objets internes bruts (Three.js, DOM). Un accès bas niveau via `RendererPort` PEUT être fourni sous **capacité explicitement déclarée**, à utiliser avec précaution.
 
 ---
 
@@ -90,6 +91,16 @@ stateDiagram-v2
 | **Déclarative** | Le package **active et configure** des plugins par `config.plugins` (`{ id, enabled, options }`). | Créateur de contenu |
 
 **Règle de sécurité (P1 + sécurité)** : un package **ne fournit pas** le code d'un plugin ; il ne peut activer que des plugins **déjà enregistrés** dans le runtime hôte. Cela évite l'exécution de code arbitraire venu d'un package. (Un futur mode « plugins sandboxés » pourra assouplir cela — chapitre 18.)
+
+### 10.5.1bis Portabilité et `requiredCapabilities` (v2, C8)
+
+La v1 était contradictoire : un package était dit « autonome et portable » (chapitre 04), mais ses plugins devaient être enregistrés par l'hôte (donc un package utilisant un plugin **ne fonctionnait pas** sur un hôte qui ne l'avait pas enregistré). La v2 réconcilie :
+
+1. **Runtime de référence** : un profil officiel embarque un **jeu de plugins standard garanti** (au minimum : `guided-tour`, `measure`, `annotations`). Un package qui n'utilise que ces plugins est **portable sur tout runtime de référence**.
+2. **`requiredCapabilities`** : un package déclare les **capacités** dont il a besoin (ex. `["scenario", "measure"]`), pas des ids de plugins concrets. Le runtime associe capacités → plugins disponibles.
+3. **Dégradation gracieuse** : si une capacité requise est absente, le moteur **charge l'objet sans la fonctionnalité** concernée + diagnostic clair (jamais d'écran noir). Une capacité `optional` manquante est ignorée silencieusement.
+
+> Reformulation normative : un package est **« portable sur tout runtime conforme au profil de capacités qu'il déclare »**. Le mot « autonome » (chapitre 04) est reprécisé en ce sens (correction C8).
 
 ### 10.5.2 Résolution et ordre
 
@@ -131,6 +142,8 @@ Le mode de communication **privilégié** est l'**Event Bus** (découplage). Deu
 ## 10.7 Exemples de plugins
 
 ### 10.7.1 Guided Tour (visite guidée)
+
+> **Propriétaire de la scénarisation (v2, C12)** : toute séquence riche (visite, présentation branchée, narration synchronisée) vit **ici**, dans ce plugin, au-dessus de l'Animation Engine. Le **noyau d'animation ne contient plus de DSL de scénario** ; il n'expose que des transitions atomiques et de l'interpolation.
 
 - **But** : enchaîner automatiquement une séquence de points d'intérêt avec narration.
 - **Options** : `{ steps: [hotspotId|componentId], autoStart, narration?, loop? }`.

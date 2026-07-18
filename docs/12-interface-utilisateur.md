@@ -1,6 +1,8 @@
 # Chapitre 12 — Interface utilisateur
 
-> L'UI est la couche 2D superposée à la scène 3D. Ce chapitre décrit les panneaux, la navigation, le breadcrumb, la toolbar, les boutons, les loaders, les transitions, le responsive et l'accessibilité. Il concerne l'**UI Manager** et s'appuie sur le **Theme Manager** (chapitre 13).
+> L'UI est la couche 2D superposée à la scène 3D. Ce chapitre décrit les panneaux, la navigation, le breadcrumb, la toolbar, les boutons, les loaders, les transitions, le responsive et l'accessibilité.
+>
+> **Révisé en spec v2 (corrections C3, C17).** L'UI n'est plus un module du core mais un **adaptateur** derrière le **`UiPort`** (contrat agnostique). L'implémentation par défaut est en **Web Components**. Le contenu de l'UI est piloté par des **descripteurs déclaratifs** (pas de JSX), ce qui rend le `plugin-sdk` indépendant de tout framework.
 
 ---
 
@@ -13,9 +15,26 @@
 5. **Accessible par conception** (P8) : clavier, ARIA, contrastes, focus visibles.
 6. **Responsive** : une seule expérience, adaptée desktop/tablette/mobile.
 
-### 12.1.1 Choix technologique (principe, non-implémentation)
+### 12.1.1 Le contrat `UiPort` (agnostique) — décision v2 (C3)
 
-L'UI est une couche **DOM/HTML** superposée (overlay) plutôt que rendue dans le canvas WebGL. Justification : accessibilité native (ARIA, focus, lecteurs d'écran), sélection de texte, responsive CSS, internationalisation, coût moindre. Le canvas 3D reste dédié à la 3D ; l'UI reste dédiée à l'interface. La technologie concrète (framework ou vanilla) est un choix d'implémentation à trancher au chapitre 15/roadmap, contraint par : légèreté, absence de dépendance lourde imposée aux intégrateurs, et respect des tokens.
+L'UI est un **adaptateur** derrière un contrat **`UiPort`** défini par le core headless. Le core **ne connaît pas** l'implémentation UI : il pousse des **descripteurs déclaratifs** et reçoit des **intentions** (événements typés). Cela lève le risque v1 (« techno UI reportée ») : le `plugin-sdk` — livrable v1 — dépend du **contrat**, jamais d'un framework.
+
+Le `UiPort` expose (conceptuellement) :
+
+| Méthode / notion | Rôle |
+|------------------|------|
+| `mountShell(descriptor)` | Monte les zones (barre haute, toolbar, breadcrumb, conteneur de panneaux). |
+| `showPanel(panelDescriptor)` / `hidePanel(id)` | Affiche/masque un panneau décrit par blocs (cf. 12.3). |
+| `setToolbar(items[])` | Définit les items de toolbar (descripteurs, pas de code). |
+| `setBreadcrumb(path[])` | Met à jour le fil d'Ariane. |
+| `setLoader(state)` | Loader + progression. |
+| `positionMarkers(markers[])` | Reçoit les positions **déjà projetées** des hotspots (données chaudes via le port, pas le bus — C9). |
+| `registerSlot(slotId)` / `renderSlot(slotId, descriptor)` | **Points d'extension** pour l'UI de plugins (cf. chapitre 10). |
+| émission d'`ui:action` (typé) | Remonte les intentions utilisateur au core. |
+
+**Implémentation par défaut : Web Components / Custom Elements.** Justification : natif (zéro dépendance lourde imposée aux intégrateurs), encapsulation (Shadow DOM), thématisable par **CSS custom properties** (design tokens, chapitre 13), accessible (ARIA/focus natifs), remplaçable (un hôte peut fournir son propre adaptateur React/Vue implémentant `UiPort`). Le choix Lit vs vanilla Custom Elements est un détail d'implémentation (arbitrage O2), sans impact sur le contrat.
+
+> **Descripteurs, pas de JSX** : un plugin décrit son UI par des **descripteurs** (`{ type, props, children }`) interprétés par l'adaptateur. Aucun plugin n'importe de framework UI. C'est ce qui garantit que le SDK reste neutre et stable sur 10 ans.
 
 ---
 
@@ -181,6 +200,15 @@ Chaque bouton possède les états **repos / survol / actif / focus / désactivé
 | **Cible tactile** | Tailles suffisantes. |
 
 > Objectif de conformité : **WCAG 2.1 niveau AA** pour l'ensemble de l'UI overlay. La 3D elle-même n'est pas « accessible » nativement ; l'équivalent textuel/navigable comble ce manque.
+
+### 12.8.1 Service d'accessibilité central (v2, C17)
+
+Pour éviter la dispersion v1 (annonces émises par UI, Hotspot, Focus, State séparément), un **service A11y central** dans le core coordonne :
+
+- un **annonceur unique** (une seule live region logique) auquel tous les modules envoient leurs messages (`focus:started` → « Focus sur GPU », `state:changed` → « Vue éclatée », progression de chargement) — évite les annonces concurrentes/contradictoires ;
+- le **registre de navigation alternative** (liste unifiée des composants/hotspots atteignables), consommé par l'adaptateur UI.
+
+Le service est **dans le core headless** (logique) ; l'adaptateur UI matérialise la live region et la liste. Les modules ne créent jamais leur propre live region.
 
 ---
 
