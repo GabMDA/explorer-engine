@@ -1,12 +1,61 @@
 # Chapitre 02 — Architecture générale
 
 > Ce chapitre décrit l'ensemble des modules du moteur : leur rôle, leurs responsabilités, leurs dépendances et leurs interactions. Il constitue la carte mentale de référence pour toute l'équipe.
+>
+> **Révisé en spec v2 (corrections C2, C6, C7, C9).** Introduit une **architecture hexagonale** (core headless + adaptateurs derrière des ports), le module **Render State Resolver** (chapitre 19), un **catalogue d'événements typé**, le contrat **`requestRender()`/frame ownership**, et corrige le **graphe de dépendances** (suppression de tout cycle).
+
+---
+
+## 2.0 Architecture hexagonale : core headless + adaptateurs (v2)
+
+La v1 plaçait le rendu (WebGL/Three.js) et l'UI (DOM) au même niveau que la logique, dans un noyau monolithique. La v2 sépare **trois responsabilités** derrière des **ports** (interfaces) :
+
+| Couche | Contenu | Dépendances externes |
+|--------|---------|----------------------|
+| **Core headless** (`@explorer-engine/core`) | Config, Render State Resolver, State Manager, Focus, Selection *logique*, Hotspot *logique*, Animation Engine, Event Bus (typé), sérialisation d'état. | **Aucune** (ni DOM, ni WebGL). |
+| **Adaptateurs** | `renderer-three` (rendu 3D), `ui-webcomponents` (UI), `input-dom` (entrées). | Three.js, DOM, WebGL — **isolés ici**. |
+| **Hôte** | L'application qui monte le moteur et branche les adaptateurs. | — |
+
+Le core **ne connaît que des ports** : `RendererPort`, `UiPort`, `InputPort`. Il n'importe jamais Three.js ni le DOM.
+
+```mermaid
+graph TB
+    subgraph "Hôte"
+        HOST[Application]
+    end
+    subgraph "Core headless (zéro DOM / zéro WebGL)"
+        CORE[Kernel]
+        RSR[Render State Resolver]
+        LOGIC[States / Focus / Selection / Hotspots logiques / Animation / Config / Event Bus typé]
+    end
+    subgraph "Ports (interfaces)"
+        RP[RendererPort]
+        UP[UiPort]
+        IP[InputPort]
+    end
+    subgraph "Adaptateurs (dépendances 3D/DOM isolées)"
+        RT[renderer-three]
+        UW[ui-webcomponents]
+        ID[input-dom]
+    end
+    HOST --> CORE
+    CORE --> RSR --> RP
+    CORE --> LOGIC
+    LOGIC --> RP & UP & IP
+    RP --> RT
+    UP --> UW
+    IP --> ID
+```
+
+**Bénéfices** : (1) la logique est **testable sans navigateur** (P9) ; (2) le moteur est **embarquable** avec une UI tierce ; (3) l'évolution **WebGPU/XR** (chapitre 18) devient un nouvel adaptateur `RendererPort`, sans toucher le core. La structure du dépôt reflète cette séparation ([chapitre 03](./03-structure-projet.md)).
+
+> Dans la suite du chapitre, les « managers » de rendu (Renderer, Scene, Camera, Controls, Lighting, Environment) et d'UI sont, en v2, des **responsabilités portées par les adaptateurs** derrière `RendererPort`/`UiPort`. La logique d'interaction (States, Focus, Selection, Hotspots) et l'orchestration restent **dans le core headless**.
 
 ---
 
 ## 2.1 Vue d'ensemble
 
-Explorer Engine est structuré en **couches** et en **modules**. Une règle absolue gouverne l'ensemble : **les dépendances vont de haut en bas et de la périphérie vers le noyau, jamais l'inverse**. Le noyau ne connaît ni les plugins, ni les objets, ni l'application hôte.
+Explorer Engine est structuré en **couches** et en **modules**. Une règle absolue gouverne l'ensemble : **les dépendances vont de haut en bas et de la périphérie vers le noyau, jamais l'inverse**. Le noyau ne connaît ni les plugins, ni les objets, ni l'application hôte, ni le backend 3D/DOM (v2 : accès via ports uniquement).
 
 ### 2.1.1 Couches
 
@@ -18,67 +67,84 @@ graph TD
     subgraph "Couche Orchestration"
         ENGINE[Explorer Engine Core - Kernel]
     end
-    subgraph "Couche Managers"
-        REN[Renderer]
-        SCN[Scene Manager]
-        CAM[Camera Manager]
-        CTRL[Controls Manager]
-        LIGHT[Lighting Manager]
-        MODEL[Model Loader]
-        ENV[Environment Manager]
-        HOT[Hotspot Manager]
-        FOCUS[Focus Manager]
-        SEL[Selection Manager]
-        STATE[State Manager]
+    subgraph "Core headless : logique d'interaction"
+        RSR[Render State Resolver]
+        HOT[Hotspot Manager - logique]
+        FOCUS[Focus Manager - mécanisme]
+        SEL[Selection Manager - logique]
+        STATE[State Manager - statechart]
         ANIM[Animation Manager]
-        UI[UI Manager]
+    end
+    subgraph "Adaptateurs (derrière RendererPort / UiPort)"
+        REN[renderer-three]
+        SCN[Scene adapter]
+        CAM[Camera adapter]
+        CTRL[Controls adapter]
+        LIGHT[Lighting adapter]
+        ENV[Environment adapter]
+        ENVRES[EnvironmentResource - env map/IBL partagée]
+        UI[ui-webcomponents]
         THEME[Theme Manager]
+    end
+    subgraph "Contenu"
+        MODEL[Model Loader]
     end
     subgraph "Couche Services (transverses)"
         CFG[Config Loader]
         PLUG[Plugin Manager]
-        BUS[Event Bus]
+        BUS[Event Bus typé]
         RES[Resource Manager]
         LOG[Diagnostics/Logger]
     end
     HOST --> ENGINE
-    ENGINE --> REN & SCN & CAM & CTRL & LIGHT & MODEL & ENV & HOT & FOCUS & SEL & STATE & ANIM & UI & THEME
+    ENGINE --> RSR & HOT & FOCUS & SEL & STATE & ANIM & MODEL
     ENGINE --> CFG & PLUG & BUS & RES & LOG
+    RSR --> REN
+    STATE & FOCUS & SEL --> RSR
+    LIGHT --> ENVRES
+    ENV --> ENVRES
     PLUG -.étend.-> ENGINE
 ```
 
-### 2.1.2 Principe de communication : l'Event Bus
+> **Note v2** : les intentions caméra/éclairage passent par des **couches** du RSR (chapitre 19), pas par des appels directs `Focus → Camera`. La ressource **`EnvironmentResource`** (env map/IBL) est **partagée** par Lighting et Environment **sans qu'ils se référencent** — ce qui casse le cycle `Lighting ↔ Environment` de la v1 (correction C6).
+
+### 2.1.2 Principe de communication : l'Event Bus **typé** (C9)
 
 Les modules **ne s'appellent pas directement** entre eux pour les notifications. Ils émettent et écoutent des **événements** via un **Event Bus** central. Cela garantit un couplage faible (P3, P5).
 
-- Communication **directe** (appel de méthode) : autorisée **uniquement** via l'orchestrateur (le Core appelle les managers) et via des contrats explicites (ex. le Focus Manager demande à la Camera de se déplacer).
-- Communication **indirecte** (événements) : privilégiée pour tout ce qui est notification/réaction (« un hotspot a été cliqué », « l'état a changé », « le modèle est chargé »).
+**Catalogue d'événements typé (C9)** : les événements ne sont **pas** des chaînes libres. Le core et le SDK exposent un **catalogue typé** — une association `nom → forme du payload` vérifiée à la compilation. Un émetteur ou un écouteur portant un nom inconnu, ou un payload mal formé, est **une erreur de compilation**, pas un bug silencieux. Cela sécurise le refactoring et la maintenance sur 10 ans.
+
+**Règle normative « pas de données par frame sur le bus »** : les données **chaudes** (positions projetées de hotspots, valeurs interpolées, deltas de frame) **ne transitent jamais** par l'Event Bus. Elles circulent par appels directs via les **ports** (`RendererPort`, etc.) et le Render State Resolver. Le bus est réservé aux **événements sémantiques** discrets (`hotspot:activated`, `state:changed`, `model:loaded`).
+
+- Communication **directe** (appel de méthode / port) : le Core appelle les modules ; les modules publient des **couches** au RSR ; les ports exposent les primitives 3D/UI.
+- Communication **indirecte** (événements typés) : notifications/réactions discrètes.
 
 ```mermaid
 sequenceDiagram
     participant U as Utilisateur
-    participant HOT as Hotspot Manager
-    participant BUS as Event Bus
+    participant HOT as Hotspot (logique)
+    participant BUS as Event Bus typé
     participant FOCUS as Focus Manager
-    participant CAM as Camera Manager
-    participant UI as UI Manager
+    participant RSR as Render State Resolver
+    participant UI as UiPort
     U->>HOT: clic sur hotspot "GPU"
-    HOT->>BUS: emit("hotspot:activated", {id:"gpu"})
-    BUS->>FOCUS: notify
-    BUS->>UI: notify
-    FOCUS->>CAM: focusOn(target)
+    HOT->>BUS: emit(hotspot:activated {id:"gpu"})
+    BUS->>FOCUS: notify (typé)
+    BUS->>UI: notify (typé)
+    FOCUS->>RSR: addLayer(cameraIntent, opacity dim, outline)
     UI->>UI: ouvre panneau d'info "GPU"
 ```
 
-### 2.1.3 Catégories de modules
+### 2.1.3 Catégories de modules (v2)
 
-| Catégorie | Modules | Nature |
-|-----------|---------|--------|
-| **Rendu 3D** | Renderer, Scene Manager, Camera Manager, Controls Manager, Lighting Manager, Environment Manager | Bas niveau, WebGL/Three.js |
-| **Contenu** | Model Loader, Resource Manager | Chargement des assets |
-| **Interaction & narration** | Hotspot Manager, Selection Manager, Focus Manager, State Manager, Animation Manager | Cœur de l'expérience |
-| **Présentation** | UI Manager, Theme Manager | Interface 2D |
-| **Système** | Config Loader, Plugin Manager, Event Bus, Diagnostics | Services transverses |
+| Catégorie | Modules | Localisation |
+|-----------|---------|--------------|
+| **Rendu 3D (adaptateurs)** | renderer-three, Scene, Camera, Controls, Lighting, Environment (+ EnvironmentResource) | Derrière `RendererPort` |
+| **Contenu** | Model Loader, Resource Manager | Core (headless) + décodeurs |
+| **État visuel** | **Render State Resolver** (chapitre 19) | Core (headless) |
+| **Interaction & narration** | Hotspot (logique), Selection (logique), Focus (mécanisme), State (statechart), Animation | Core (headless) |
+| **Présentation (adaptateur)** | ui-webcomponents, Theme Manager | Derrière `UiPort` |
+| **Système** | Config Loader, Plugin Manager, Event Bus typé, Resource Manager, Diagnostics, Navigation (opt-in) | Core (headless) |
 
 ---
 
@@ -89,10 +155,22 @@ Orchestrateur central. Point d'entrée unique du moteur. Il instancie, initialis
 
 ### Responsabilités
 - Exposer l'**API publique** du moteur (création d'une instance, chargement d'un package, contrôle du cycle de vie).
-- Séquencer le **bootstrap** : charger la config → préparer le rendu → charger le modèle → construire hotspots/états → monter l'UI → démarrer la boucle de rendu.
-- Détenir et fournir le **contexte partagé** (accès contrôlé aux managers, à l'Event Bus, à la config résolue).
-- Gérer la **boucle de rendu** (render loop) et la distribuer aux modules qui en ont besoin (update par frame).
-- Gérer le **teardown** propre (libération mémoire, dispose des ressources GPU, désabonnement des événements).
+- **Brancher les adaptateurs** (`RendererPort`, `UiPort`, `InputPort`) fournis par l'hôte (v2, C2).
+- Séquencer le **bootstrap** : charger la config → préparer le rendu → charger le modèle → construire hotspots/états → monter l'UI → démarrer la boucle.
+- Détenir et fournir le **contexte partagé** (accès contrôlé aux modules du core, à l'Event Bus typé, à la config résolue).
+- Gérer le **teardown** propre (dispose des ressources via les ports, désabonnement des événements, annulation des chargements en cours — C16).
+
+### Contrat de boucle de rendu : `requestRender()` + frame ownership (v2, C7)
+
+La v1 promettait un « rendu à la demande » mais n'arbitrait pas les animations continues (ventilateur en boucle, autoplay idle, audio spatial). La v2 définit un **contrat explicite d'ownership de frame** :
+
+| Primitive | Sémantique |
+|-----------|-----------|
+| `requestRender()` | Demande **une** frame (rendu ponctuel). Appelé par le RSR quand une couche change, par l'InputPort sur interaction, par un resize. Idempotent au sein d'une frame. |
+| `acquireFrameLoop(owner): FrameHandle` | Un producteur d'animation **acquiert un handle** : tant qu'au moins un handle est vivant, la boucle tourne en continu (60 FPS cible). |
+| `handle.release()` | Libère le handle. Quand **tous** les handles sont libérés, la boucle **se met en veille** (plus aucun rendu jusqu'au prochain `requestRender()`). |
+
+Détenteurs typiques de handle : un tween/timeline actif (Animation Engine), un clip GLB en boucle, un plugin qui anime en continu. Résultat : **zéro rendu sur scène stable**, **60 FPS garantis pendant les animations**, sans clip figé (correction du conflit v1 F11). Détail perf au [chapitre 14](./14-performances.md).
 
 ### Dépendances
 - Tous les managers et services (il les possède).
@@ -152,7 +230,7 @@ Détient et organise le **graphe de scène** (scene graph) : la hiérarchie des 
 - Fournir des utilitaires de requête sur le graphe (trouver par nom, par tag, calculer bounding boxes).
 
 ### Dépendances
-- Model Loader (fournit le contenu), Lighting Manager, Environment Manager (ajoutent des objets).
+- Model Loader (fournit le contenu), Lighting Manager, Environment Manager (ajoutent des objets). L'env map/IBL provient de `EnvironmentResource` (partagée, sans référence croisée Lighting↔Environment — C6).
 
 ### Interactions
 - Interrogé par Hotspot Manager (positions d'ancrage), Focus Manager (bounding boxes), State Manager (groupes à animer), Selection Manager (raycasting).
@@ -233,12 +311,12 @@ Charge et prépare les modèles 3D (GLB/glTF) et leurs dérivés.
 - Gérer les **LOD** (niveaux de détail) si fournis, et l'**instancing** pour les éléments répétés.
 - Rapporter la progression du chargement (pour le loader UI) et gérer les erreurs (asset manquant, format invalide).
 
-### Dépendances
-- Resource Manager (résolution des chemins et cache), Scene Manager (insertion), Animation Manager (clips).
+### Dépendances (v2)
+- Resource Manager (chemins et cache), Scene adapter (insertion). **Ne dépend pas de l'Animation Manager** : le loader **produit un descripteur de clips** (données pures) que l'Animation Manager consomme (inversion de dépendance, correction C6/F25).
 
 ### Interactions
-- Émet `model:loading` (progress), `model:loaded`, `model:error`.
-- Fournit l'index des composants au Hotspot/Focus/State Managers.
+- Émet `model:loading` (progress), `model:loaded`, `model:error` (événements typés, C9).
+- Fournit l'index des composants (clé **`explorerId`**, repli nom — C5) au Hotspot/Focus/State Managers via le core.
 
 ---
 
@@ -254,7 +332,7 @@ Gère l'environnement visuel autour de l'objet : arrière-plan, sol, brouillard,
 - Gérer le **brouillard**/atmosphère si pertinent.
 
 ### Dépendances
-- Lighting Manager (partage des env maps), Scene Manager, Resource Manager.
+- **`EnvironmentResource`** (env map/IBL partagée), Scene adapter, Resource Manager. **Ne dépend pas du Lighting Manager** (v2, C6) : les deux consomment `EnvironmentResource` sans se référencer.
 
 ### Interactions
 - Piloté par la config et par le Theme Manager (l'arrière-plan fait partie de l'identité visuelle).
@@ -291,19 +369,18 @@ Gère les **points d'intérêt** ancrés sur le modèle 3D et projetés en 2D.
 ### Rôle
 Met en avant un composant sélectionné : cadrage caméra, isolation, mise en valeur, et retour.
 
-### Responsabilités
+### Responsabilités (v2 — mécanisme, pas état ; C4)
 - Recevoir une demande de focus (depuis un hotspot, la sélection, l'UI, ou un plugin).
-- Calculer le **cadrage** optimal (via Camera Manager) pour englober la cible.
-- Appliquer la **mise en valeur** : dimming du reste, outline, transparence des occultants, éclairage dédié.
-- Gérer la **pile de focus** (focus imbriqués / sous-composants) et le **retour** (revenir au niveau précédent).
-- Coordonner avec l'UI (panneau d'information) et le State Manager.
+- **Publier des couches** au Render State Resolver : `cameraIntent` (cadrage), `opacity` (dim), `visibility` (isolate), `outline`, `lightingIntent` — au lieu de muter la scène.
+- Gérer la **pile de focus** et le **retour** = **retrait de couches** (jamais de restauration).
+- Coordonner l'UI d'information via `UiPort`.
 
-### Dépendances
-- Camera Manager, Selection Manager, Scene Manager, Animation Manager, UI Manager.
+### Dépendances (v2)
+- **Render State Resolver** (cible des couches), Selection Manager, Animation Engine (interpolation), `UiPort`. **Ne dépend plus** directement de Camera/Lighting/Scene/UI Manager (couplage v1 supprimé — C6).
 
 ### Interactions
-- Émet `focus:started`, `focus:ended`, `focus:changed`.
-- Modifie temporairement contrôles, éclairage, matériaux.
+- Émet `focus:started`, `focus:ended`, `focus:changed` (événements typés).
+- Superposé à l'état courant, **indépendant** du State Manager.
 
 ---
 
@@ -474,31 +551,43 @@ Journalisation structurée (niveaux : debug/info/warn/error), overlay de perform
 
 ## 2.20 Matrice de dépendances (synthèse)
 
-Lecture : une ligne « dépend de » les colonnes cochées. Le noyau et les services transverses sont omis (tous en dépendent).
+Lecture : une ligne « dépend de » les colonnes cochées. Le Core, le RSR et les services transverses (Event Bus, Resource, Diagnostics) sont omis. **Matrice régénérée en v2 (C6) — vérifiée sans cycle.**
 
-| Module ↓ dépend de → | Scene | Camera | Anim | Model | Lighting | Env | UI | Theme | EventBus |
-|----------------------|:-----:|:------:|:----:|:-----:|:--------:|:---:|:--:|:-----:|:--------:|
-| Renderer | ✔ | ✔ | | | | | | | |
-| Camera Manager | ✔ | — | ✔ | | | | | | ✔ |
-| Controls Manager | | ✔ | | | | | | | ✔ |
-| Lighting Manager | ✔ | | | | — | ✔ | | | |
-| Model Loader | ✔ | | ✔ | — | ✔ | | | | ✔ |
-| Environment Manager | ✔ | | | | ✔ | — | | ✔ | |
-| Hotspot Manager | ✔ | ✔ | ✔ | | | | ✔ | | ✔ |
-| Selection Manager | ✔ | ✔ | | | | | | | ✔ |
-| Focus Manager | ✔ | ✔ | ✔ | | ✔ | | ✔ | | ✔ |
-| State Manager | ✔ | ✔ | ✔ | | ✔ | | | | ✔ |
-| UI Manager | | | | | | | — | ✔ | ✔ |
+Légende : **RSR** = Render State Resolver · **EnvRes** = EnvironmentResource · **Anim** = Animation Engine · les colonnes Camera/Lighting/Scene/Env sont des **adaptateurs derrière `RendererPort`**.
 
-> **Règle** : aucune dépendance ne remonte vers le Core ou vers les plugins. Le graphe de dépendances DOIT rester acyclique (DAG). Toute interaction « remontante » passe par l'Event Bus.
+| Module ↓ dépend de → | RSR | Anim | Camera | Scene | Lighting | EnvRes | RendererPort | UiPort | EventBus |
+|----------------------|:---:|:----:|:------:|:-----:|:--------:|:------:|:------------:|:------:|:--------:|
+| renderer-three (adapter) | | | ✔ | ✔ | ✔ | | — | | |
+| Camera adapter | | ✔ | — | ✔ | | | | | |
+| Controls adapter | | | ✔ | | | | | | |
+| Lighting adapter | | | | ✔ | — | ✔ | | | |
+| Environment adapter | | | | ✔ | | ✔ | | | |
+| Model Loader | | | | ✔ | | | | | ✔ |
+| **Render State Resolver** | — | ✔ | | | | | ✔ | | |
+| Hotspot Manager (logique) | ✔ | ✔ | | | | | ✔ | ✔ | ✔ |
+| Selection Manager (logique) | ✔ | | | | | | ✔ | | ✔ |
+| Focus Manager (mécanisme) | ✔ | ✔ | | | | | | ✔ | ✔ |
+| State Manager (statechart) | ✔ | ✔ | | | | | | | ✔ |
+| ui-webcomponents (adapter) | | | | | | | | — | ✔ |
+
+**Vérification d'acyclicité (v2)** :
+- `Lighting → EnvRes ← Environment` : plus de référence croisée `Lighting ↔ Environment` → **cycle supprimé**.
+- `Model Loader` ne dépend plus de `Anim` (il produit des données de clips) → **arête inversée**.
+- `Focus / State / Selection → RSR → RendererPort` : dépendances **descendantes** uniquement ; plus de `Focus → Camera/Lighting/UI`.
+- `RSR` dépend de `Anim` (interpolation) et `RendererPort` (application) ; `Anim` ne dépend d'aucun de ces modules → **pas de cycle**.
+
+> **Règle** : aucune dépendance ne remonte vers le Core, le RSR-amont ou les plugins. Le graphe DOIT rester **acyclique (DAG)**, et cette propriété est **vérifiée automatiquement** (règle de lint anti-cycle + test de non-régression du graphe — [chapitre 15](./15-standards-code.md)). Toute interaction « remontante » passe par l'Event Bus **typé**.
 
 ---
 
 ## 2.21 Règles d'architecture (normatives)
 
-1. **DAG obligatoire** : le graphe de dépendances entre modules est acyclique. Un cycle est un bug d'architecture.
-2. **Le noyau ne connaît pas les plugins** : l'extension va des plugins vers le moteur, jamais l'inverse.
-3. **Aucun module ne connaît un objet spécifique** : pas de `if (objet === "voiture")` où que ce soit (P1).
-4. **Communication montante = événements** : un module bas niveau n'appelle jamais un module haut niveau directement.
-5. **État observable, mutations traçables** : chaque changement d'état significatif émet un événement.
-6. **Dispose systématique** : tout module qui alloue des ressources GPU/DOM/écouteurs implémente un `dispose` appelé au teardown.
+1. **DAG obligatoire** : le graphe de dépendances est acyclique, **vérifié automatiquement** (lint + test). Un cycle est un bug d'architecture.
+2. **Core headless** : le core n'importe ni Three.js ni le DOM ; il ne connaît que des **ports** (`RendererPort`, `UiPort`, `InputPort`) — v2, C2.
+3. **Le noyau ne connaît pas les plugins** : l'extension va des plugins vers le moteur, jamais l'inverse.
+4. **Aucun module ne connaît un objet spécifique** : pas de `if (objet === "voiture")` où que ce soit (P1).
+5. **Aucune mutation directe de la scène** : l'état visuel passe **exclusivement** par des couches du **Render State Resolver** (chapitre 19, C1).
+6. **Événements typés** : toute notification passe par le **catalogue d'événements typé** ; **aucune donnée par frame** sur le bus (C9).
+7. **Rendu piloté** : le rendu se déclenche par `requestRender()` ou tant qu'un **frame handle** est vivant (C7) ; jamais de boucle 60 FPS inconditionnelle.
+8. **État observable et sérialisable** : chaque changement significatif émet un événement ; l'état runtime est **sérialisable** (chapitre 20, C10).
+9. **Dispose systématique** : tout module qui alloue des ressources (via ports/écouteurs) implémente un `dispose` ; les chargements en cours sont **annulables** (C16).

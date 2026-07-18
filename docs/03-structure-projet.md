@@ -20,13 +20,16 @@ La structure suit quatre principes :
 ```
 explorer-engine/
 ├── docs/                      # Cette documentation (source de vérité)
-├── packages/                  # Code publiable (moteur + plugins officiels)
-│   ├── core/                  #   @explorer-engine/core — le moteur
-│   ├── plugin-sdk/            #   @explorer-engine/plugin-sdk — API pour écrire des plugins
+├── packages/                  # Code publiable (moteur + adaptateurs + plugins officiels)
+│   ├── core/                  #   @explorer-engine/core — HEADLESS (zéro DOM/WebGL) : logique, RSR, états, ports
+│   ├── renderer-three/        #   @explorer-engine/renderer-three — adaptateur RendererPort (Three.js isolé ICI)
+│   ├── ui-webcomponents/      #   @explorer-engine/ui-webcomponents — adaptateur UiPort (Web Components)
+│   ├── input-dom/             #   @explorer-engine/input-dom — adaptateur InputPort (souris/tactile/clavier)
+│   ├── plugin-sdk/            #   @explorer-engine/plugin-sdk — API pour écrire des plugins (dépend des ports, pas des internes)
 │   ├── plugins/               #   Plugins officiels (un sous-dossier chacun)
 │   │   ├── measure/
 │   │   ├── annotations/
-│   │   ├── guided-tour/
+│   │   ├── guided-tour/       #   (assure la scénarisation — cf. C12)
 │   │   ├── minimap/
 │   │   └── audio-spatial/
 │   └── schema/                #   @explorer-engine/schema — schéma du config.json + validation
@@ -48,43 +51,50 @@ explorer-engine/
 
 ---
 
-## 3.3 Structure interne du moteur (`packages/core`)
+## 3.3 Structure interne du moteur (v2 : core headless + adaptateurs)
 
-Chaque module du chapitre 02 est un dossier. La structure est **par domaine** (feature-based), pas par type technique.
+**Changement v2 (C2/C3)** : le rendu (Three.js) et l'UI (DOM) **sortent** du `core` vers des **packages adaptateurs** séparés. Le `core` devient **headless** (zéro DOM, zéro WebGL) et ne connaît que des **ports**.
+
+### 3.3.1 `packages/core` (headless)
 
 ```
 packages/core/
 ├── src/
-│   ├── engine/                # Kernel : orchestration, cycle de vie, contexte, API publique
-│   ├── rendering/
-│   │   ├── renderer/          # Renderer (WebGL, post-processing)
-│   │   ├── scene/             # Scene Manager
-│   │   ├── camera/            # Camera Manager
-│   │   ├── controls/          # Controls Manager
-│   │   ├── lighting/          # Lighting Manager
-│   │   └── environment/       # Environment Manager
+│   ├── engine/                # Kernel : orchestration, cycle de vie, branchement des adaptateurs, requestRender/frame owners
+│   ├── ports/                 # Contrats : RendererPort, UiPort, InputPort (interfaces PURES)
+│   ├── render-state/          # Render State Resolver (chapitre 19) : couches, canaux, rest pose
 │   ├── content/
-│   │   ├── model-loader/      # Model Loader (glTF/Draco/KTX2)
-│   │   └── resources/         # Resource Manager (fetch, cache)
+│   │   ├── model-loader/      # Model Loader (glTF/Draco/KTX2) — produit géométrie + descripteurs de clips + index explorerId
+│   │   └── resources/         # Resource Manager (fetch, cache, annulation)
 │   ├── interaction/
-│   │   ├── hotspots/          # Hotspot Manager
-│   │   ├── selection/         # Selection Manager
-│   │   ├── focus/             # Focus Manager
-│   │   └── states/            # State Manager
-│   ├── animation/             # Animation Manager (tweens, timelines, mixer)
-│   ├── ui/                    # UI Manager (overlay, panneaux, toolbar, loaders)
-│   ├── theme/                 # Theme Manager (design tokens)
-│   ├── config/               # Config Loader (chargement + normalisation ; le schéma vit dans packages/schema)
+│   │   ├── hotspots/          # Hotspot Manager (LOGIQUE : ancrage, occlusion, projection déléguée au port)
+│   │   ├── selection/         # Selection Manager (logique de picking/granularité)
+│   │   ├── focus/             # Focus Manager (mécanisme → couches)
+│   │   └── states/            # State Manager (statechart → couches)
+│   ├── animation/             # Animation Engine (tweens, enchaînement, mixer) — PAS de DSL de scénario (cf. C12)
+│   ├── theme/                 # Theme Manager (design tokens, agnostique du rendu)
+│   ├── config/                # Config Loader (chargement + normalisation + $ref ; schéma dans packages/schema)
+│   ├── navigation/            # (opt-in) sérialisation d'état ↔ URL/History (chapitre 20)
+│   ├── events/                # Event Bus TYPÉ (catalogue nom→payload)
+│   ├── diagnostics/           # Logger, métriques
+│   ├── math/                  # Utilitaires géométriques purs
 │   ├── plugins/               # Plugin Manager (cycle de vie, contexte d'API)
-│   ├── events/                # Event Bus (pub/sub typé)
-│   ├── diagnostics/           # Logger, overlay perf
-│   ├── math/                  # Utilitaires géométriques partagés (si besoin)
-│   ├── types/                 # Types publics transverses
-│   └── index.ts               # API publique du moteur (barrel exports)
-├── tests/                     # (ou colocalisé *.test.ts par module)
-├── package.json
+│   ├── types/                 # Types publics transverses (Address typée, RuntimeState…)
+│   └── index.ts               # API publique (barrel)
+├── tests/                     # Tests unitaires SANS navigateur (le core est headless → testable)
+├── package.json               # AUCUNE dépendance three / DOM
 └── README.md
 ```
+
+### 3.3.2 Adaptateurs (dépendances 3D/DOM isolées)
+
+```
+packages/renderer-three/       # implémente RendererPort avec Three.js (rendu, scene, camera, controls, lighting, environment, EnvironmentResource, projection, occlusion BVH)
+packages/ui-webcomponents/     # implémente UiPort en Web Components (panneaux, toolbar, breadcrumb, marqueurs de hotspots, loaders)
+packages/input-dom/            # implémente InputPort (pointer/touch/keyboard/gyroscope) → événements normalisés vers le core
+```
+
+> **Invariant v2** : `core/package.json` ne contient **ni** `three` **ni** de dépendance DOM. Toute violation est un défaut d'architecture (vérifiable en CI). Le `renderer-three` est le **seul** endroit où Three.js est importé.
 
 ### 3.3.1 Convention interne d'un module
 
@@ -159,21 +169,28 @@ examples/explorer-packages/gaming-pc/
 
 ```mermaid
 graph TD
-    SCHEMA[schema] --> CORE[core]
+    SCHEMA[schema] --> CORE["core (headless)"]
+    CORE --> RT[renderer-three]
+    CORE --> UW[ui-webcomponents]
+    CORE --> ID[input-dom]
     CORE --> SDK[plugin-sdk]
     SDK --> P1[plugins/*]
     CORE --> APP[apps/playground]
+    RT --> APP
+    UW --> APP
+    ID --> APP
     P1 --> APP
     DATA[examples/explorer-packages/*] -. chargées à l'exécution .-> APP
 ```
 
-Règles normatives :
+Règles normatives (v2) :
 
 1. `schema` ne dépend de rien d'interne (feuille de l'arbre).
-2. `core` peut dépendre de `schema`. `core` **ne dépend pas** des plugins.
-3. `plugin-sdk` expose une façade au-dessus du `core` ; les plugins dépendent **uniquement** du `plugin-sdk`.
-4. `examples/*` ne contient **aucune** dépendance de code ; c'est de la donnée chargée à l'exécution.
-5. `apps/*` peut tout consommer mais n'est **jamais** consommé par le reste.
+2. `core` peut dépendre de `schema`. `core` **ne dépend ni** des plugins, **ni** de Three.js, **ni** du DOM (headless).
+3. Les **adaptateurs** (`renderer-three`, `ui-webcomponents`, `input-dom`) **implémentent** les ports du `core` ; ils dépendent du `core` (pour les types de ports), jamais l'inverse.
+4. `plugin-sdk` expose une façade au-dessus du `core` **et des contrats de ports** ; les plugins dépendent **uniquement** du `plugin-sdk`.
+5. `examples/*` ne contient **aucune** dépendance de code ; c'est de la donnée chargée à l'exécution.
+6. `apps/*` (hôte) branche core + adaptateurs ; il peut tout consommer mais n'est **jamais** consommé par le reste.
 
 ---
 
