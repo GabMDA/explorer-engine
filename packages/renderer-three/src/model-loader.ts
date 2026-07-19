@@ -34,6 +34,7 @@ import type {
 import type { SceneManager } from './scene-manager';
 import type { CameraManager } from './camera-manager';
 import type { ThreeRendererHandle } from './internal/handles';
+import { createNodeIndex } from './node-index';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -154,6 +155,7 @@ export function createModelLoader(options: ModelLoaderOptions): ModelLoaderPort 
       scene.remove(current);
       disposeObject(current);
       current = null;
+      scene.setNodeIndex(null); // drop identity references (no leak, L20)
     }
   };
 
@@ -211,6 +213,10 @@ export function createModelLoader(options: ModelLoaderOptions): ModelLoaderPort 
     current = gltf.scene;
     scene.add(current);
 
+    // Build the node index (P2-T4) and expose it on the Scene Manager.
+    const index = createNodeIndex(current);
+    scene.setNodeIndex(index);
+
     // 4. Bounding box + 5. auto-framing (headless math) + 6. sync controls.
     emitLoading(url, 'framing');
     const box3 = new THREE.Box3().setFromObject(current);
@@ -235,7 +241,7 @@ export function createModelLoader(options: ModelLoaderOptions): ModelLoaderPort 
     options.requestRender?.();
     emitLoading(url, 'ready');
     options.events?.emit('model:loaded', { url, boundingBox });
-    return { url, boundingBox, framing };
+    return { url, boundingBox, framing, nodes: index.descriptors() };
   }
 
   return {

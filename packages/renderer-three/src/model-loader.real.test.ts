@@ -35,6 +35,8 @@ describe('createModelLoader — real GLB parse (cube fixture)', () => {
     const scene = {
       add: (o: THREE.Object3D) => added.push(o),
       remove: (o: THREE.Object3D) => removed.push(o),
+      setNodeIndex: () => {},
+      getNodeIndex: () => null,
     } as unknown as SceneManager;
 
     const cam = new THREE.PerspectiveCamera(50, 1.5, 0.1, 100);

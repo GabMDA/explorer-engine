@@ -96,7 +96,12 @@ function deps() {
       Promise.resolve({ url: 'https://cdn/pkg/' + path, bytes: new Uint8Array([1, 2, 3, 4]) }),
     dispose: vi.fn(),
   } as unknown as ResourceManager;
-  const scene = { add: vi.fn(), remove: vi.fn() } as unknown as SceneManager;
+  const scene = {
+    add: vi.fn(),
+    remove: vi.fn(),
+    setNodeIndex: vi.fn(),
+    getNodeIndex: () => null,
+  } as unknown as SceneManager;
   const cam = new THREE.PerspectiveCamera(50, 1.5, 0.1, 100);
   const camera = {
     getThreeCamera: () => cam,

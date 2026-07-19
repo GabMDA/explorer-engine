@@ -4,12 +4,17 @@
 import * as THREE from 'three';
 import type { ScenePort, BoundingBox } from '@explorer-engine/core';
 import type { ThreeSceneHandle } from './internal/handles';
+import type { NodeIndex } from './node-index';
 
 export interface SceneManager extends ScenePort, ThreeSceneHandle {
   /** Add an object to the root scene. */
   add(object: THREE.Object3D): void;
   /** Remove an object from the root scene. */
   remove(object: THREE.Object3D): void;
+  /** The node index of the currently loaded model, or null (P2-T4). */
+  getNodeIndex(): NodeIndex | null;
+  /** Set (or clear) the node index. Called by the Model Loader after insertion. */
+  setNodeIndex(index: NodeIndex | null): void;
 }
 
 function toTuple(v: THREE.Vector3): [number, number, number] {
@@ -18,6 +23,7 @@ function toTuple(v: THREE.Vector3): [number, number, number] {
 
 export function createSceneManager(): SceneManager {
   const scene = new THREE.Scene();
+  let nodeIndex: NodeIndex | null = null;
   let disposed = false;
 
   return {
@@ -31,6 +37,11 @@ export function createSceneManager(): SceneManager {
       scene.remove(object);
     },
 
+    getNodeIndex: () => nodeIndex,
+    setNodeIndex(index) {
+      nodeIndex = index;
+    },
+
     getBoundingBox(): BoundingBox | null {
       const box = new THREE.Box3().setFromObject(scene);
       if (box.isEmpty()) return null;
@@ -40,6 +51,7 @@ export function createSceneManager(): SceneManager {
     dispose() {
       if (disposed) return;
       disposed = true;
+      nodeIndex = null;
       scene.traverse((object) => {
         const mesh = object as Partial<THREE.Mesh>;
         mesh.geometry?.dispose();
