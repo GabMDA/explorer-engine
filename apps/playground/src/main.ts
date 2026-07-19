@@ -1,16 +1,22 @@
-// Explorer Engine — development playground (P1-T3).
+// Explorer Engine — development playground (P1-T4).
 //
 // Assembles EXISTING adapters only: the Three.js renderer/scene/camera, the
-// headless orbit controls (core), and the DOM input adapter. It imports no
-// Three.js and no DOM-control logic directly. A minimal interaction-driven
-// render loop runs while the controls are moving (damping) and auto-stops when
-// idle — the engine's structured on-demand loop is P1-T5. Teardown removes every
-// DOM listener and stops the loop.
-import { createOrbitControls } from '@explorer-engine/core';
+// Lighting and Environment Managers (P1-T4), the headless orbit controls (core),
+// and the DOM input adapter (P1-T3). It imports no Three.js and no DOM-control
+// logic directly. The demo scene ships WITHOUT its own lights
+// (`includeLights: false`) so lighting comes exclusively from the Lighting
+// Manager (studio preset) and PBR reflections from the Environment Manager's
+// in-code neutral-room IBL. A minimal interaction-driven render loop runs while
+// the controls are moving and auto-stops when idle — the engine's structured
+// on-demand loop is P1-T5. Teardown removes every DOM listener, stops the loop,
+// and disposes every manager.
+import { createOrbitControls, getLightingPreset } from '@explorer-engine/core';
 import {
   createThreeRenderer,
   createDemoScene,
   createCameraManager,
+  createLightingManager,
+  createEnvironmentManager,
 } from '@explorer-engine/renderer-three';
 import { createDomInput } from '@explorer-engine/input-dom';
 
@@ -23,7 +29,7 @@ if (app) {
   const caption = document.createElement('p');
   caption.className = 'caption';
   caption.textContent =
-    'Explorer Engine — P1-T3 · drag = orbit · wheel = zoom · arrows/Shift+arrows/+- = keyboard';
+    'Explorer Engine — P1-T4 · studio lighting + neutral-room IBL · drag = orbit · wheel = zoom';
   document.body.appendChild(caption);
 
   const position: [number, number, number] = [3, 2, 4];
@@ -31,11 +37,22 @@ if (app) {
 
   const renderer = createThreeRenderer({
     canvas,
-    clearColor: '#101014',
     toneMapping: 'aces-filmic',
   });
-  const scene = createDemoScene();
+  // The scene ships its object only; lighting/environment own the rest (P1-T4).
+  const scene = createDemoScene({ includeLights: false });
   const camera = createCameraManager({ position, target });
+
+  // Lighting: studio preset. Environment: gradient background + neutral-room IBL.
+  const lighting = createLightingManager(scene);
+  lighting.apply(getLightingPreset('studio'));
+
+  const environment = createEnvironmentManager({ scene, renderer });
+  environment.apply({
+    background: { kind: 'gradient', top: '#2a3350', bottom: '#0a0b12' },
+    environment: 'neutral-room',
+    environmentIntensity: 1,
+  });
   const controls = createOrbitControls(camera, {
     position,
     target,
@@ -82,6 +99,10 @@ if (app) {
     window.removeEventListener('resize', resize);
     input.dispose();
     controls.dispose();
+    // Dispose managers before the scene so their lights/textures/env maps are
+    // removed and released, then the scene frees the object geometry/material.
+    environment.dispose();
+    lighting.dispose();
     scene.dispose();
     renderer.dispose();
     caption.remove();
