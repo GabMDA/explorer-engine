@@ -12,3 +12,6 @@ export type { LightingManager } from './lighting-manager';
 
 export { createEnvironmentManager } from './environment-manager';
 export type { EnvironmentManagerOptions } from './environment-manager';
+
+export { createModelLoader } from './model-loader';
+export type { ModelLoaderOptions } from './model-loader';

@@ -32,6 +32,12 @@ export interface OrbitControlsOptions {
 export interface OrbitControls extends ControlInput {
   /** Ease toward the goal, write the camera, and report whether it is still moving. */
   update(): boolean;
+  /**
+   * Re-seat the orbit at a new camera pose (e.g. after auto-framing a loaded
+   * model). Sets both the goal AND the current state so there is no easing jump,
+   * and future gestures orbit around the new `target`.
+   */
+  setView(position: Vec3, target: Vec3): void;
   /** Subscribe to "a new goal was set" notifications (to wake a render loop). */
   onChange(handler: () => void): Unsubscribe;
   /** Release listeners. Idempotent. */
@@ -132,6 +138,28 @@ export function createOrbitControls(
     notify();
   };
 
+  const setView: OrbitControls['setView'] = (position, target) => {
+    if (disposed) return;
+    const dx = position[0] - target[0];
+    const dy = position[1] - target[1];
+    const dz = position[2] - target[2];
+    const r = clamp(Math.hypot(dx, dy, dz) || minDistance, minDistance, maxDistance);
+    goal.azimuth = Math.atan2(dx, dz);
+    goal.polar = clamp(Math.acos(clamp(dy / r, -1, 1)), minPolar, maxPolar);
+    goal.radius = r;
+    goal.tx = target[0];
+    goal.ty = target[1];
+    goal.tz = target[2];
+    // Snap current to goal: no easing jump, and update() writes the pose at once.
+    current.azimuth = goal.azimuth;
+    current.polar = goal.polar;
+    current.radius = goal.radius;
+    current.tx = goal.tx;
+    current.ty = goal.ty;
+    current.tz = goal.tz;
+    notify();
+  };
+
   const update: OrbitControls['update'] = () => {
     if (disposed) return false;
     current.azimuth += (goal.azimuth - current.azimuth) * damping;
@@ -165,6 +193,7 @@ export function createOrbitControls(
     zoom,
     pan,
     update,
+    setView,
     onChange(handler) {
       handlers.add(handler);
       return () => handlers.delete(handler);

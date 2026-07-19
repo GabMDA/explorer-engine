@@ -72,4 +72,21 @@ export {
 } from './lighting';
 export type { LightingPresetId } from './lighting';
 
-export type { EngineEventMap, EngineDisposedEvent } from './types/events';
+export { computeCameraFraming, ModelLoadError } from './model';
+export type {
+  FramingOptions,
+  FramingResult,
+  ModelLoaderPort,
+  ModelLoadRequest,
+  ModelLoadResult,
+  ModelLoadProgress,
+  ModelLoadPhase,
+} from './model';
+
+export type {
+  EngineEventMap,
+  EngineDisposedEvent,
+  ModelLoadingEvent,
+  ModelLoadedEvent,
+  ModelErrorEvent,
+} from './types/events';
