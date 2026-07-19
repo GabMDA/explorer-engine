@@ -10,7 +10,10 @@ import type {
   RendererSize,
   ColorSpace,
   ToneMapping,
+  ScenePort,
+  CameraPort,
 } from '@explorer-engine/core';
+import type { ThreeSceneHandle, ThreeCameraHandle } from './internal/handles';
 
 /** Options for the Three.js renderer adapter. The host owns and passes the canvas. */
 export interface ThreeRendererOptions extends RendererConfig {
@@ -73,9 +76,19 @@ export function createThreeRenderer(options: ThreeRendererOptions): RendererPort
     getPixelRatio() {
       return renderer.getPixelRatio();
     },
-    render() {
+    render(scene: ScenePort, camera: CameraPort) {
       if (disposed) return;
-      renderer.clear();
+      const sceneHandle = scene as Partial<ThreeSceneHandle>;
+      const cameraHandle = camera as Partial<ThreeCameraHandle>;
+      if (
+        typeof sceneHandle.getThreeScene !== 'function' ||
+        typeof cameraHandle.getThreeCamera !== 'function'
+      ) {
+        throw new TypeError(
+          'renderer-three: render() expects a scene/camera created by @explorer-engine/renderer-three',
+        );
+      }
+      renderer.render(sceneHandle.getThreeScene(), cameraHandle.getThreeCamera());
     },
     dispose() {
       if (disposed) return;

@@ -5,6 +5,12 @@
   "description": "RendererPort adapter — the ONLY package allowed to import Three.js. P1-T1: WebGL renderer (canvas, color space, tone mapping, resize, pixel ratio, dispose).",
   "license": "UNLICENSED",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
