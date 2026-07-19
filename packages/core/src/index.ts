@@ -46,6 +46,24 @@ export { createRenderLoop } from './render';
 export type { RenderLoop, RenderLoopOptions, FrameScheduler, FrameRequestToken } from './render';
 
 export {
+  createResourceManager,
+  ResourceCancelledError,
+  createCancellationSource,
+  resolveResourcePath,
+  isAbsolutePath,
+} from './resources';
+export type {
+  ResourceManager,
+  ResourceManagerOptions,
+  ResourceTransport,
+  ResourceRequest,
+  ResourceData,
+  TimeoutScheduler,
+  CancellationSignal,
+  CancellationSource,
+} from './resources';
+
+export {
   lightingPresets,
   getLightingPreset,
   STUDIO_LIGHTING,
