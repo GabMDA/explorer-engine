@@ -8,3 +8,19 @@ export type {
 export type { ScenePort, BoundingBox } from './scene-port';
 export type { CameraPort, Vec3 } from './camera-port';
 export type { ControlInput, InputPort } from './input-port';
+export type {
+  ColorValue,
+  AmbientLightSpec,
+  HemisphereLightSpec,
+  DirectionalLightSpec,
+  PointLightSpec,
+  LightSpec,
+  LightingPreset,
+  LightingPort,
+} from './lighting-port';
+export type {
+  BackgroundSpec,
+  EnvironmentSource,
+  EnvironmentSpec,
+  EnvironmentPort,
+} from './environment-port';
