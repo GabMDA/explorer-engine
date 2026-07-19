@@ -1,4 +1,4 @@
-// Explorer Engine — development playground (P1-T4).
+// Explorer Engine — development playground (P1-T5).
 //
 // Assembles EXISTING adapters only: the Three.js renderer/scene/camera, the
 // Lighting and Environment Managers (P1-T4), the headless orbit controls (core),
@@ -6,11 +6,12 @@
 // logic directly. The demo scene ships WITHOUT its own lights
 // (`includeLights: false`) so lighting comes exclusively from the Lighting
 // Manager (studio preset) and PBR reflections from the Environment Manager's
-// in-code neutral-room IBL. A minimal interaction-driven render loop runs while
-// the controls are moving and auto-stops when idle — the engine's structured
-// on-demand loop is P1-T5. Teardown removes every DOM listener, stops the loop,
-// and disposes every manager.
-import { createOrbitControls, getLightingPreset } from '@explorer-engine/core';
+// in-code neutral-room IBL. Rendering is driven by the engine's headless
+// on-demand render loop (P1-T5): frames are requested on mount, input activity,
+// resize and while the controls are still easing — never a continuous loop on a
+// stable scene. Teardown disposes the loop (cancelling any pending frame), every
+// DOM listener and every manager.
+import { createOrbitControls, getLightingPreset, createRenderLoop } from '@explorer-engine/core';
 import {
   createThreeRenderer,
   createDemoScene,
@@ -29,7 +30,7 @@ if (app) {
   const caption = document.createElement('p');
   caption.className = 'caption';
   caption.textContent =
-    'Explorer Engine — P1-T4 · studio lighting + neutral-room IBL · drag = orbit · wheel = zoom';
+    'Explorer Engine — P1-T5 · on-demand rendering · studio lighting · drag = orbit · wheel = zoom';
   document.body.appendChild(caption);
 
   const position: [number, number, number] = [3, 2, 4];
@@ -60,26 +61,25 @@ if (app) {
     maxDistance: 12,
   });
 
-  // Interaction-driven render loop: runs while the controls are still moving,
-  // then stops. Woken by input activity and by resize.
-  let rafId = 0;
-  let running = false;
-  const frame = () => {
-    const active = controls.update();
-    renderer.render(scene, camera);
-    if (active) {
-      rafId = requestAnimationFrame(frame);
-    } else {
-      running = false;
-      rafId = 0;
-    }
-  };
-  const wake = () => {
-    if (!running) {
-      running = true;
-      rafId = requestAnimationFrame(frame);
-    }
-  };
+  // On-demand render loop (P1-T5): renders only when something invalidates the
+  // frame — never a continuous loop on a stable scene. The DOM-based frame
+  // scheduler (requestAnimationFrame) is supplied here, keeping the core headless.
+  let renderCount = 0; // dev-only counter, used by browser idle verification
+  const loop = createRenderLoop({
+    scheduler: {
+      request: (cb) => requestAnimationFrame(cb),
+      cancel: (id) => cancelAnimationFrame(id),
+    },
+    render: () => {
+      renderCount += 1;
+      const moving = controls.update();
+      renderer.render(scene, camera);
+      // Damping: while the controls are still easing toward their goal, keep the
+      // loop alive one frame at a time; it settles to idle once movement stops.
+      if (moving) loop.requestRender();
+    },
+  });
+  const wake = () => loop.requestRender();
 
   const resize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -90,12 +90,11 @@ if (app) {
   const input = createDomInput({ element: canvas, input: controls, onActivity: wake });
 
   window.addEventListener('resize', resize);
-  resize(); // initial size + first render
+  resize(); // initial size + first render request
   canvas.focus(); // enable keyboard controls right away
 
   const teardown = () => {
-    if (rafId) cancelAnimationFrame(rafId);
-    running = false;
+    loop.dispose(); // cancels any pending frame
     window.removeEventListener('resize', resize);
     input.dispose();
     controls.dispose();
@@ -118,6 +117,8 @@ if (app) {
   if (import.meta.env.DEV) {
     (window as unknown as { __ee?: unknown }).__ee = {
       cameraPosition: () => camera.getThreeCamera().position.toArray(),
+      renderCount: () => renderCount,
+      hasPendingFrame: () => loop.hasPendingFrame,
       teardown,
     };
   }
