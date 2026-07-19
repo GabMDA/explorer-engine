@@ -7,4 +7,5 @@ export type {
   ModelLoadResult,
   ModelLoadProgress,
   ModelLoadPhase,
+  NodeDescriptor,
 } from './model-loader-port';

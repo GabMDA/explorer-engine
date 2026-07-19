@@ -23,6 +23,17 @@ export interface ModelLoadProgress {
   readonly phase: ModelLoadPhase;
 }
 
+/**
+ * Data-only identity of an indexed model node (P2-T4). The concrete 3D object it
+ * refers to stays in the renderer adapter — only its identities cross to the Core.
+ */
+export interface NodeDescriptor {
+  /** Stable id from `extras.explorerId` (primary identity, ADR-003), if any. */
+  readonly explorerId?: string;
+  /** glTF node name (fragile fallback identity), if any. */
+  readonly name?: string;
+}
+
 /** Data-only summary of a successfully loaded model. */
 export interface ModelLoadResult {
   /** Resolved URL the model came from. */
@@ -31,6 +42,8 @@ export interface ModelLoadResult {
   readonly boundingBox: BoundingBox;
   /** The framing computed and applied for this model. */
   readonly framing: FramingResult;
+  /** Data-only descriptors of the indexed nodes (identities only). */
+  readonly nodes: readonly NodeDescriptor[];
 }
 
 /** Public, data-only error for a failed model load (no backend objects). */
