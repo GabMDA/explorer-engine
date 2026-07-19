@@ -13,6 +13,16 @@ export type { EventHandler, Unsubscribe, EventBusOptions } from './events';
 export { createLogger } from './diagnostics';
 export type { Logger, LogLevel, LogEntry, LogSink, LoggerOptions } from './diagnostics';
 
-export type { RendererPort, RendererConfig, RendererSize, ColorSpace, ToneMapping } from './ports';
+export type {
+  RendererPort,
+  RendererConfig,
+  RendererSize,
+  ColorSpace,
+  ToneMapping,
+  ScenePort,
+  BoundingBox,
+  CameraPort,
+  Vec3,
+} from './ports';
 
 export type { EngineEventMap, EngineDisposedEvent } from './types/events';

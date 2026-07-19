@@ -5,3 +5,5 @@ export type {
   ColorSpace,
   ToneMapping,
 } from './renderer-port';
+export type { ScenePort, BoundingBox } from './scene-port';
+export type { CameraPort, Vec3 } from './camera-port';
