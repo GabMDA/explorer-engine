@@ -1,0 +1,2 @@
+Explorer Engine — P2-T1 Resource Manager fixture.
+This small static asset exists only to demonstrate a real fetch-transport load.

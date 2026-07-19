@@ -14,6 +14,7 @@
     "packages/renderer-three",
     "packages/ui-webcomponents",
     "packages/input-dom",
+    "packages/resource-fetch",
     "packages/plugin-sdk",
     "packages/schema",
     "packages/plugins/*",
