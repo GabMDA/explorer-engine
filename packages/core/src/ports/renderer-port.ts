@@ -3,8 +3,10 @@
 // L8/L9 ; ADR-002). A concrete adapter (e.g. @explorer-engine/renderer-three)
 // implements this port; the host owns the canvas and constructs the adapter.
 //
-// Deliberately minimal for P1-T1: canvas ownership stays in the adapter, so this
-// interface exposes only DOM-free runtime operations.
+// Canvas ownership stays in the adapter, so this interface exposes only DOM-free
+// runtime operations.
+import type { ScenePort } from './scene-port';
+import type { CameraPort } from './camera-port';
 
 /** Output color space of the rendered image. */
 export type ColorSpace = 'srgb' | 'srgb-linear';
@@ -36,7 +38,8 @@ export interface RendererSize {
 
 /**
  * A renderer the core can size, draw and tear down. Backend-agnostic.
- * At P1-T1 `render()` clears the drawing buffer (no scene exists yet).
+ * `render` draws a {@link ScenePort} through a {@link CameraPort}; both handles
+ * are produced by the same adapter (the core never sees the backend objects).
  */
 export interface RendererPort {
   /** Resize the drawing buffer (CSS pixels; pixel ratio applied internally). */
@@ -47,8 +50,8 @@ export interface RendererPort {
   getSize(): RendererSize;
   /** Current device pixel ratio. */
   getPixelRatio(): number;
-  /** Render one frame (clears the buffer until a scene is introduced). */
-  render(): void;
+  /** Render one frame: draw `scene` as seen by `camera`. */
+  render(scene: ScenePort, camera: CameraPort): void;
   /** Release all GPU resources and the rendering context. Idempotent. */
   dispose(): void;
 }

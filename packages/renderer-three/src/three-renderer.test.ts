@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ScenePort, CameraPort } from '@explorer-engine/core';
 
 // A minimal stand-in for THREE.WebGLRenderer so tests run without a GPU/WebGL.
 interface MockRenderer {
@@ -10,7 +11,7 @@ interface MockRenderer {
   height: number;
   clearColor?: unknown;
   clearAlpha?: number;
-  clears: number;
+  rendered: unknown[][];
   disposed: number;
   contextLost: number;
 }
@@ -27,7 +28,7 @@ vi.mock('three', () => {
     height = 0;
     clearColor?: unknown;
     clearAlpha?: number;
-    clears = 0;
+    rendered: unknown[][] = [];
     disposed = 0;
     contextLost = 0;
     constructor() {
@@ -47,8 +48,8 @@ vi.mock('three', () => {
       this.clearColor = color;
       this.clearAlpha = alpha;
     }
-    clear() {
-      this.clears += 1;
+    render(scene: unknown, camera: unknown) {
+      this.rendered.push([scene, camera]);
     }
     dispose() {
       this.disposed += 1;
@@ -72,6 +73,19 @@ vi.mock('three', () => {
 import { createThreeRenderer } from './three-renderer';
 
 const canvas = {} as HTMLCanvasElement;
+
+// Fake port handles carrying the underlying (stand-in) three objects.
+const scene = {
+  getThreeScene: () => 'THREE_SCENE',
+  getBoundingBox: () => null,
+  dispose: () => {},
+} as unknown as ScenePort;
+const camera = {
+  getThreeCamera: () => 'THREE_CAMERA',
+  setAspect: () => {},
+  setView: () => {},
+  dispose: () => {},
+} as unknown as CameraPort;
 
 beforeEach(() => {
   instances.length = 0;
@@ -118,19 +132,32 @@ describe('createThreeRenderer', () => {
     expect(renderer.getPixelRatio()).toBe(2);
   });
 
-  it('render clears the buffer; dispose releases context and is idempotent', () => {
+  it('render draws the scene through the camera', () => {
     const renderer = createThreeRenderer({ canvas, pixelRatio: 1 });
-    renderer.render();
-    renderer.render();
-    expect(instances[0]?.clears).toBe(2);
+    renderer.render(scene, camera);
+    renderer.render(scene, camera);
+    expect(instances[0]?.rendered).toEqual([
+      ['THREE_SCENE', 'THREE_CAMERA'],
+      ['THREE_SCENE', 'THREE_CAMERA'],
+    ]);
+  });
 
+  it('render rejects a foreign scene/camera not from renderer-three', () => {
+    const renderer = createThreeRenderer({ canvas, pixelRatio: 1 });
+    const foreign = { getBoundingBox: () => null, dispose: () => {} } as unknown as ScenePort;
+    expect(() => renderer.render(foreign, camera)).toThrow(TypeError);
+  });
+
+  it('dispose releases context, is idempotent, and render is a no-op after dispose', () => {
+    const renderer = createThreeRenderer({ canvas, pixelRatio: 1 });
+    renderer.render(scene, camera);
     renderer.dispose();
     expect(instances[0]?.disposed).toBe(1);
     expect(instances[0]?.contextLost).toBe(1);
 
     renderer.dispose(); // idempotent
-    renderer.render(); // no-op after dispose
+    renderer.render(scene, camera); // no-op after dispose
     expect(instances[0]?.disposed).toBe(1);
-    expect(instances[0]?.clears).toBe(2);
+    expect(instances[0]?.rendered).toHaveLength(1);
   });
 });
