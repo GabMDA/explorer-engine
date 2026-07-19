@@ -1,25 +1,33 @@
-// Explorer Engine — development playground (P1-T5).
+// Explorer Engine — development playground (P2-T2).
 //
-// Assembles EXISTING adapters only: the Three.js renderer/scene/camera, the
+// Assembles EXISTING services only: the Three.js renderer/scene/camera, the
 // Lighting and Environment Managers (P1-T4), the headless orbit controls (core),
-// and the DOM input adapter (P1-T3). It imports no Three.js and no DOM-control
-// logic directly. The demo scene ships WITHOUT its own lights
-// (`includeLights: false`) so lighting comes exclusively from the Lighting
-// Manager (studio preset) and PBR reflections from the Environment Manager's
-// in-code neutral-room IBL. Rendering is driven by the engine's headless
-// on-demand render loop (P1-T5): frames are requested on mount, input activity,
-// resize and while the controls are still easing — never a continuous loop on a
-// stable scene. Teardown disposes the loop (cancelling any pending frame), every
-// DOM listener and every manager.
-import { createOrbitControls, getLightingPreset, createRenderLoop } from '@explorer-engine/core';
+// the DOM input adapter (P1-T3), the on-demand render loop (P1-T5), the Resource
+// Manager (P2-T1) with the fetch transport, and the Model Loader (P2-T2). It
+// imports no Three.js and parses no GLB itself — the Model Loader fetches the
+// bytes through the Resource Manager, parses them, inserts the model, frames the
+// camera and re-targets the controls. The scene starts EMPTY (no demo cube): the
+// GLB is the only object. Teardown disposes everything in a safe order.
+import {
+  createOrbitControls,
+  getLightingPreset,
+  createRenderLoop,
+  createResourceManager,
+  EventBus,
+  type EngineEventMap,
+} from '@explorer-engine/core';
 import {
   createThreeRenderer,
-  createDemoScene,
+  createSceneManager,
   createCameraManager,
   createLightingManager,
   createEnvironmentManager,
+  createModelLoader,
 } from '@explorer-engine/renderer-three';
+import { createFetchTransport } from '@explorer-engine/resource-fetch';
 import { createDomInput } from '@explorer-engine/input-dom';
+
+const MODEL_PATH = 'models/cube.glb';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 
@@ -29,22 +37,13 @@ if (app) {
 
   const caption = document.createElement('p');
   caption.className = 'caption';
-  caption.textContent =
-    'Explorer Engine — P1-T5 · on-demand rendering · studio lighting · drag = orbit · wheel = zoom';
+  caption.textContent = 'Explorer Engine — P2-T2 · loading model…';
   document.body.appendChild(caption);
 
-  const position: [number, number, number] = [3, 2, 4];
-  const target: [number, number, number] = [0, 0, 0];
+  const renderer = createThreeRenderer({ canvas, toneMapping: 'aces-filmic' });
+  const scene = createSceneManager(); // empty; the GLB is the only object
+  const camera = createCameraManager({ position: [3, 2, 4], target: [0, 0, 0] });
 
-  const renderer = createThreeRenderer({
-    canvas,
-    toneMapping: 'aces-filmic',
-  });
-  // The scene ships its object only; lighting/environment own the rest (P1-T4).
-  const scene = createDemoScene({ includeLights: false });
-  const camera = createCameraManager({ position, target });
-
-  // Lighting: studio preset. Environment: gradient background + neutral-room IBL.
   const lighting = createLightingManager(scene);
   lighting.apply(getLightingPreset('studio'));
 
@@ -54,17 +53,17 @@ if (app) {
     environment: 'neutral-room',
     environmentIntensity: 1,
   });
+
+  // Generous limits so auto-framing can place the camera freely.
   const controls = createOrbitControls(camera, {
-    position,
-    target,
-    minDistance: 2,
-    maxDistance: 12,
+    position: [3, 2, 4],
+    target: [0, 0, 0],
+    minDistance: 0.1,
+    maxDistance: 100,
   });
 
-  // On-demand render loop (P1-T5): renders only when something invalidates the
-  // frame — never a continuous loop on a stable scene. The DOM-based frame
-  // scheduler (requestAnimationFrame) is supplied here, keeping the core headless.
-  let renderCount = 0; // dev-only counter, used by browser idle verification
+  // On-demand render loop (P1-T5): only renders when something invalidates a frame.
+  let renderCount = 0; // dev-only counter for browser idle verification
   const loop = createRenderLoop({
     scheduler: {
       request: (cb) => requestAnimationFrame(cb),
@@ -74,8 +73,6 @@ if (app) {
       renderCount += 1;
       const moving = controls.update();
       renderer.render(scene, camera);
-      // Damping: while the controls are still easing toward their goal, keep the
-      // loop alive one frame at a time; it settles to idle once movement stops.
       if (moving) loop.requestRender();
     },
   });
@@ -90,16 +87,63 @@ if (app) {
   const input = createDomInput({ element: canvas, input: controls, onActivity: wake });
 
   window.addEventListener('resize', resize);
-  resize(); // initial size + first render request
-  canvas.focus(); // enable keyboard controls right away
+  resize(); // initial size (sets aspect used by framing) + first render request
+  canvas.focus();
+
+  // Resource Manager (P2-T1) + fetch transport, owned by the host (playground).
+  const resourceManager = createResourceManager({
+    transport: createFetchTransport(),
+    baseUrl: window.location.origin + '/',
+    timeoutMs: 15000,
+    timeoutScheduler: {
+      schedule: (cb, ms) => {
+        const id = window.setTimeout(cb, ms);
+        return () => window.clearTimeout(id);
+      },
+    },
+  });
+
+  // Typed events → console diagnostics (no full loader UI at P2-T2).
+  const events = new EventBus<EngineEventMap>();
+  events.on('model:loading', (e) => console.info(`[model] ${e.phase}: ${e.url}`));
+  events.on('model:loaded', (e) => {
+    console.info('[model] loaded', e.url, e.boundingBox);
+    caption.textContent = 'Explorer Engine — P2-T2 · GLB loaded · drag = orbit · wheel = zoom';
+  });
+  events.on('model:error', (e) => {
+    console.error('[model] error', e.url, e.message);
+    caption.textContent = `Explorer Engine — P2-T2 · model error: ${e.message}`;
+  });
+
+  const modelLoader = createModelLoader({
+    resourceManager,
+    scene,
+    camera,
+    controls,
+    events,
+    requestRender: wake,
+  });
+
+  let modelBox: { min: readonly number[]; max: readonly number[] } | null = null;
+  let modelError: string | null = null;
+  const modelReady = modelLoader
+    .load({ path: MODEL_PATH })
+    .then((result) => {
+      modelBox = result.boundingBox;
+    })
+    .catch((error: unknown) => {
+      modelError = error instanceof Error ? error.message : String(error);
+    });
 
   const teardown = () => {
     loop.dispose(); // cancels any pending frame
     window.removeEventListener('resize', resize);
     input.dispose();
     controls.dispose();
-    // Dispose managers before the scene so their lights/textures/env maps are
-    // removed and released, then the scene frees the object geometry/material.
+    modelLoader.dispose(); // removes + releases the loaded model
+    resourceManager.dispose(); // cancels any in-flight fetch (host owns it)
+    events.clear();
+    // Dispose managers before the scene so their GPU resources are released first.
     environment.dispose();
     lighting.dispose();
     scene.dispose();
@@ -119,6 +163,10 @@ if (app) {
       cameraPosition: () => camera.getThreeCamera().position.toArray(),
       renderCount: () => renderCount,
       hasPendingFrame: () => loop.hasPendingFrame,
+      modelReady: () => modelReady,
+      modelBoundingBox: () => modelBox,
+      modelError: () => modelError,
+      sceneChildCount: () => scene.getThreeScene().children.length,
       teardown,
     };
   }
