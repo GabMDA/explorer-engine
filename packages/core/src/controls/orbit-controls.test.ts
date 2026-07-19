@@ -133,6 +133,31 @@ describe('createOrbitControls', () => {
     expect(controls.update()).toBe(false);
   });
 
+  it('setView re-targets without an easing jump and notifies onChange', () => {
+    const { port, views } = fakeCamera();
+    const controls = createOrbitControls(port, {
+      position: [0, 0, 5],
+      target: [0, 0, 0],
+      dampingFactor: 0.2, // damped: proves setView snaps (no easing) despite low factor
+      minDistance: 1,
+      maxDistance: 100,
+    });
+    const onChange = vi.fn();
+    controls.onChange(onChange);
+
+    controls.setView([11, 12, 16], [11, 12, 13]); // frame an off-centre model
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    // First update writes the new pose immediately (no jump) and settles at once.
+    const moving = controls.update();
+    const view = last(views);
+    expect(view.target[0]).toBeCloseTo(11);
+    expect(view.target[1]).toBeCloseTo(12);
+    expect(view.target[2]).toBeCloseTo(13);
+    expect(distance(view.position, [11, 12, 13])).toBeCloseTo(3); // radius = |pos-target|
+    expect(moving).toBe(false); // current == goal → no residual motion / first-interaction jump
+  });
+
   it('respects enableRotate / enableZoom / enablePan flags', () => {
     const { port, views } = fakeCamera();
     const controls = createOrbitControls(port, {
