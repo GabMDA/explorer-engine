@@ -25,9 +25,30 @@ export type {
   Vec3,
   ControlInput,
   InputPort,
+  ColorValue,
+  AmbientLightSpec,
+  HemisphereLightSpec,
+  DirectionalLightSpec,
+  PointLightSpec,
+  LightSpec,
+  LightingPreset,
+  LightingPort,
+  BackgroundSpec,
+  EnvironmentSource,
+  EnvironmentSpec,
+  EnvironmentPort,
 } from './ports';
 
 export { createOrbitControls } from './controls';
 export type { OrbitControls, OrbitControlsOptions } from './controls';
+
+export {
+  lightingPresets,
+  getLightingPreset,
+  STUDIO_LIGHTING,
+  OUTDOOR_LIGHTING,
+  NIGHT_LIGHTING,
+} from './lighting';
+export type { LightingPresetId } from './lighting';
 
 export type { EngineEventMap, EngineDisposedEvent } from './types/events';

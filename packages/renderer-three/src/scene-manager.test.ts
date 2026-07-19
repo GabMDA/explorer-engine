@@ -44,4 +44,11 @@ describe('createDemoScene', () => {
     expect(hasLight).toBe(true);
     expect(hasMesh).toBe(true);
   });
+
+  it('includeLights:false ships only the object (Lighting Manager owns the lights)', () => {
+    const manager = createDemoScene({ includeLights: false });
+    const children = manager.getThreeScene().children;
+    expect(children.some((child) => child instanceof THREE.Light)).toBe(false);
+    expect(children.some((child) => child instanceof THREE.Mesh)).toBe(true);
+  });
 });
