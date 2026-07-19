@@ -11,7 +11,9 @@ import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/*.md', 'package-lock.json'],
+    // `public/**` holds vendored decoder assets (minified UMD/WASM) that must not
+    // be linted or reformatted (P2-T3).
+    ignores: ['**/node_modules/**', '**/dist/**', '**/public/**', '**/*.md', 'package-lock.json'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -61,7 +63,7 @@ export default tseslint.config(
     // Node tooling scripts and config files (ESM): allow Node globals.
     files: ['scripts/**/*.mjs', 'eslint.config.mjs', '**/*.config.*'],
     languageOptions: {
-      globals: { process: 'readonly', console: 'readonly', URL: 'readonly' },
+      globals: { process: 'readonly', console: 'readonly', URL: 'readonly', Buffer: 'readonly' },
     },
   },
   {

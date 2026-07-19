@@ -1,5 +1,7 @@
 node_modules
 dist
 package-lock.json
+# Vendored decoder assets (minified UMD / WASM) — never reformatted (P2-T3).
+**/public/**
 # Frozen specification & governance docs are not reformatted by Prettier.
 **/*.md

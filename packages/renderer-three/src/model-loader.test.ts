@@ -26,6 +26,9 @@ const { gltf } = vi.hoisted(() => ({
 
 vi.mock('three/examples/jsm/loaders/GLTFLoader.js', () => ({
   GLTFLoader: class {
+    setDRACOLoader() {}
+    setKTX2Loader() {}
+    setMeshoptDecoder() {}
     parse(
       _buffer: ArrayBuffer,
       path: string,
@@ -203,6 +206,23 @@ describe('createModelLoader — errors', () => {
     await expect(loader.load({ path: 'bad.glb' })).rejects.toBeInstanceOf(ModelLoadError);
     expect(errors).toHaveLength(1);
     expect(scene.added).toHaveLength(0); // no partial insert
+  });
+
+  it('a later load still succeeds after an error (loader not disposed)', async () => {
+    const { rm } = fakeResourceManager();
+    const scene = fakeScene();
+    const loader = createModelLoader({
+      resourceManager: rm,
+      scene: scene.scene,
+      camera: fakeCamera(),
+    });
+
+    gltf.mode = 'error';
+    await expect(loader.load({ path: 'bad.glb' })).rejects.toBeInstanceOf(ModelLoadError);
+
+    gltf.mode = 'success';
+    await expect(loader.load({ path: 'good.glb' })).resolves.toBeDefined();
+    expect(scene.added).toHaveLength(1);
   });
 });
 
