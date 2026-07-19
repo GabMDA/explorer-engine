@@ -1,13 +1,14 @@
-// Explorer Engine — development playground (P2-T2).
+// Explorer Engine — development playground (P2-T3).
 //
 // Assembles EXISTING services only: the Three.js renderer/scene/camera, the
 // Lighting and Environment Managers (P1-T4), the headless orbit controls (core),
 // the DOM input adapter (P1-T3), the on-demand render loop (P1-T5), the Resource
-// Manager (P2-T1) with the fetch transport, and the Model Loader (P2-T2). It
-// imports no Three.js and parses no GLB itself — the Model Loader fetches the
-// bytes through the Resource Manager, parses them, inserts the model, frames the
-// camera and re-targets the controls. The scene starts EMPTY (no demo cube): the
-// GLB is the only object. Teardown disposes everything in a safe order.
+// Manager (P2-T1) with the fetch transport, and the Model Loader (P2-T2/T3). It
+// imports no Three.js and parses no GLB itself. The Model Loader is configured
+// with the Draco/KTX2 decoder paths (P2-T3); their WASM (served from public/) is
+// fetched lazily by Three.js only when a GLB actually uses the extension. The
+// scene starts EMPTY (no demo cube): the GLB is the only object. Teardown disposes
+// everything in a safe order.
 import {
   createOrbitControls,
   getLightingPreset,
@@ -27,7 +28,12 @@ import {
 import { createFetchTransport } from '@explorer-engine/resource-fetch';
 import { createDomInput } from '@explorer-engine/input-dom';
 
-const MODEL_PATH = 'models/cube.glb';
+// Dev switch: `?model=compressed` loads the Draco+KTX2 fixture (P2-T3); the
+// default is the uncompressed cube.glb (P2-T2). No product UI — just a query param.
+const MODEL_PATH =
+  new URLSearchParams(window.location.search).get('model') === 'compressed'
+    ? 'models/compressed-cube.glb'
+    : 'models/cube.glb';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 
@@ -37,7 +43,7 @@ if (app) {
 
   const caption = document.createElement('p');
   caption.className = 'caption';
-  caption.textContent = 'Explorer Engine — P2-T2 · loading model…';
+  caption.textContent = 'Explorer Engine — P2-T3 · loading model…';
   document.body.appendChild(caption);
 
   const renderer = createThreeRenderer({ canvas, toneMapping: 'aces-filmic' });
@@ -106,13 +112,14 @@ if (app) {
   // Typed events → console diagnostics (no full loader UI at P2-T2).
   const events = new EventBus<EngineEventMap>();
   events.on('model:loading', (e) => console.info(`[model] ${e.phase}: ${e.url}`));
+  const modelName = MODEL_PATH.split('/').pop();
   events.on('model:loaded', (e) => {
     console.info('[model] loaded', e.url, e.boundingBox);
-    caption.textContent = 'Explorer Engine — P2-T2 · GLB loaded · drag = orbit · wheel = zoom';
+    caption.textContent = `Explorer Engine — P2-T3 · ${modelName} loaded · drag = orbit · wheel = zoom`;
   });
   events.on('model:error', (e) => {
     console.error('[model] error', e.url, e.message);
-    caption.textContent = `Explorer Engine — P2-T2 · model error: ${e.message}`;
+    caption.textContent = `Explorer Engine — P2-T3 · model error: ${e.message}`;
   });
 
   const modelLoader = createModelLoader({
@@ -122,6 +129,12 @@ if (app) {
     controls,
     events,
     requestRender: wake,
+    // Compression decoders (P2-T3): WASM served from public/, fetched lazily by
+    // Three.js only when a GLB actually uses the matching extension. The renderer
+    // is needed for KTX2Loader.detectSupport.
+    dracoDecoderPath: 'decoders/draco/',
+    ktx2TranscoderPath: 'decoders/basis/',
+    renderer,
   });
 
   let modelBox: { min: readonly number[]; max: readonly number[] } | null = null;
