@@ -23,6 +23,11 @@ export type {
   BoundingBox,
   CameraPort,
   Vec3,
+  ControlInput,
+  InputPort,
 } from './ports';
+
+export { createOrbitControls } from './controls';
+export type { OrbitControls, OrbitControlsOptions } from './controls';
 
 export type { EngineEventMap, EngineDisposedEvent } from './types/events';

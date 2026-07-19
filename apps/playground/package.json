@@ -2,7 +2,7 @@
   "name": "@explorer-engine/playground",
   "version": "0.0.0",
   "private": true,
-  "description": "Development playground: assembles the engine's renderer/scene/camera to display a demo cube. Imports no Three.js directly (all 3D lives in renderer-three).",
+  "description": "Development playground: assembles the renderer/scene/camera, the orbit controls and the DOM input adapter into an interactive demo. Imports no Three.js directly.",
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
@@ -12,6 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@explorer-engine/core": "0.0.0",
+    "@explorer-engine/input-dom": "0.0.0",
     "@explorer-engine/renderer-three": "0.0.0"
   },
   "devDependencies": {
