@@ -1,0 +1,23 @@
+{
+  "name": "@explorer-engine/validate-package",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Offline Explorer Package validator (roadmap P3-T4): checks config.json against the schema, asset presence, and node correspondence (explorerId/name) against the GLB.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bin": {
+    "validate-package": "bin.mts"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@explorer-engine/schema": "0.0.0"
+  }
+}
