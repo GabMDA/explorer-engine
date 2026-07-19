@@ -81,7 +81,30 @@ export type {
   ModelLoadResult,
   ModelLoadProgress,
   ModelLoadPhase,
+  NodeDescriptor,
 } from './model';
+
+export {
+  createConfigLoader,
+  resolveConfigFromJson,
+  ConfigError,
+  environmentSpecFromConfig,
+  lightingPresetIdFromConfig,
+} from './config';
+export type { ConfigLoader, ConfigLoaderOptions, LoadedConfig } from './config';
+// Re-export the schema's public data types so hosts get them from one entry point.
+export type {
+  ResolvedConfig,
+  ModelConfig,
+  EnvironmentConfig,
+  LightingConfig,
+  CameraConfig,
+  CameraControlsConfig,
+  ComponentConfig,
+  NodeRef,
+  ConfigIssue,
+  ValidationResult,
+} from '@explorer-engine/schema';
 
 export type {
   EngineEventMap,

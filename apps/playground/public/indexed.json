@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0",
+  "meta": { "title": "Explorer Engine — indexed model", "defaultLocale": "en" },
+  "model": { "src": "models/indexed.glb" },
+  "environment": {
+    "background": { "kind": "gradient", "top": "#20304a", "bottom": "#05070a" },
+    "source": "neutral-room"
+  },
+  "lighting": { "preset": "studio" },
+  "components": [
+    { "id": "crown", "label": "Crown", "nodes": [{ "explorerId": "crown" }], "group": "externals" },
+    { "id": "gears", "label": "Gears", "nodes": [{ "explorerId": "gear" }, { "explorerId": "gear2" }], "group": "internals" },
+    { "id": "legacy", "label": "Legacy by name", "nodes": [{ "name": "Crown" }] }
+  ]
+}

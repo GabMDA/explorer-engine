@@ -2,7 +2,16 @@
   "name": "@explorer-engine/schema",
   "version": "0.0.0",
   "private": true,
-  "description": "config.json schema definition and validation, reusable by tooling. No code yet (P0-T1).",
+  "description": "Normative, versioned config.json schema + validator + defaults + migration (chapter 05). Headless, data-only, zero runtime dependency.",
   "license": "UNLICENSED",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
 }

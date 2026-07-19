@@ -1,10 +1,13 @@
 {
-  "name": "@explorer-engine/core",
+  "name": "@explorer-engine/validate-package",
   "version": "0.0.0",
   "private": true,
-  "description": "Headless core (no DOM, no WebGL): P0-T4 skeleton — engine create/dispose lifecycle, typed event bus, diagnostics logger. Orchestration, ports, render-state resolver, states, focus, selection, animation and config arrive in later phases.",
+  "description": "Offline Explorer Package validator (roadmap P3-T4): checks config.json against the schema, asset presence, and node correspondence (explorerId/name) against the GLB.",
   "license": "UNLICENSED",
   "type": "module",
+  "bin": {
+    "validate-package": "bin.mts"
+  },
   "exports": {
     ".": {
       "types": "./src/index.ts",

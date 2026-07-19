@@ -81,6 +81,8 @@ function fakeScene() {
   const scene = {
     add: (o: THREE.Object3D) => added.push(o),
     remove: (o: THREE.Object3D) => removed.push(o),
+    setNodeIndex: () => {},
+    getNodeIndex: () => null,
   } as unknown as SceneManager;
   return { scene, added, removed };
 }
