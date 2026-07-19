@@ -2,7 +2,7 @@
   "name": "@explorer-engine/playground",
   "version": "0.0.0",
   "private": true,
-  "description": "Development playground (P0-T3): a minimal host page with a Vite dev server + HMR. No engine code, no 3D — used only to verify the dev environment starts.",
+  "description": "Development playground: assembles the engine's renderer/scene/camera to display a demo cube. Imports no Three.js directly (all 3D lives in renderer-three).",
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
@@ -10,6 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@explorer-engine/renderer-three": "0.0.0"
   },
   "devDependencies": {
     "vite": "8.1.5"

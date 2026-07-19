@@ -1,24 +1,24 @@
 # @explorer-engine/playground
 
-Development playground for Explorer Engine (**P0-T3**). A minimal web app with a
-**Vite** dev server + **HMR** that mounts an empty host page. It exists solely to
-verify that the development environment starts and hot-reloads.
+Development playground for Explorer Engine. **P1-T2** : assemble le renderer, une
+scène de démonstration (cube unité éclairé) et une caméra pour la **première
+validation visuelle réelle** du moteur. N'importe **aucun** Three.js directement
+(tout le 3D vit dans `@explorer-engine/renderer-three`).
 
-- **Statut** : shell minimal (P0-T3). **Aucun code moteur, aucun rendu 3D.**
-- **Référence** : chapitres 03 §3.2, 16 (P0-T3).
+- **Statut** : P1-T2. Rendu à la demande (mount + resize) ; pas de boucle continue (P1-T5).
+- **Référence** : chapitres 03 §3.2, 16 (P1-T2).
 
 ## Lancer
 
-Depuis la racine du dépôt :
-
 ```bash
 npm install
-npm run dev            # équivaut à: npm run dev -w @explorer-engine/playground
+npm run dev            # ou : npm run dev -w @explorer-engine/playground
 ```
 
-Vite affiche une URL locale (par défaut http://localhost:5173). La page affiche
-un shell « Explorer Engine — Playground ». Modifier `src/main.ts` ou `index.html`
-met la page à jour **à chaud** (HMR), sans rechargement complet.
+Vite affiche une URL locale (par défaut http://localhost:5173). Un canvas WebGL
+plein écran affiche un cube bleu éclairé sur fond sombre. Redimensionner la
+fenêtre reprojette et re-rend la scène. Le teardown (HMR / fermeture) retire le
+listener de resize et libère les ressources GPU — aucune boucle active.
 
 ## Scripts
 
@@ -28,8 +28,3 @@ met la page à jour **à chaud** (HMR), sans rechargement complet.
 | `build` | Build de production (`vite build`) → `dist/` (ignoré par git). |
 | `preview` | Sert le build de production (`vite preview`). |
 | `typecheck` | Vérification TypeScript (`tsc --noEmit`). |
-
-## À venir (hors P0-T3)
-
-L'hébergement réel du moteur (core headless + adaptateurs + UI) sera branché ici
-lors des phases ultérieures (P0-T4 et suivantes).
