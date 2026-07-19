@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "1.0",
+  "meta": { "title": "Explorer Engine — minimal config", "defaultLocale": "en" },
+  "model": { "src": "models/cube.glb" }
+}

@@ -34,6 +34,8 @@
     "clean": "npm run clean --workspaces --if-present",
     "decoders:copy": "node scripts/copy-decoders.mjs",
     "fixtures:compressed": "node scripts/gen-compressed-cube.mjs",
+    "fixtures:indexed": "node scripts/gen-indexed-model.mjs",
+    "validate:package": "tsx tools/validate-package/bin.mts",
     "ci": "npm run typecheck && npm run lint && npm run format && npm run check:arch && npm run test && npm run build"
   },
   "devDependencies": {
@@ -48,6 +50,7 @@
     "ktx2-encoder": "0.6.0",
     "pngjs": "7.0.0",
     "prettier": "3.9.5",
+    "tsx": "4.19.2",
     "typescript": "6.0.3",
     "typescript-eslint": "8.64.0",
     "vitest": "4.1.10"
