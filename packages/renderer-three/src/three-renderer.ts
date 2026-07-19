@@ -13,7 +13,7 @@ import type {
   ScenePort,
   CameraPort,
 } from '@explorer-engine/core';
-import type { ThreeSceneHandle, ThreeCameraHandle } from './internal/handles';
+import type { ThreeSceneHandle, ThreeCameraHandle, ThreeRendererHandle } from './internal/handles';
 
 /** Options for the Three.js renderer adapter. The host owns and passes the canvas. */
 export interface ThreeRendererOptions extends RendererConfig {
@@ -43,7 +43,9 @@ function resolvePixelRatio(config: RendererConfig): number {
  * Create a Three.js-backed renderer that satisfies {@link RendererPort}.
  * At P1-T1 `render()` clears the drawing buffer (no scene yet).
  */
-export function createThreeRenderer(options: ThreeRendererOptions): RendererPort {
+export function createThreeRenderer(
+  options: ThreeRendererOptions,
+): RendererPort & ThreeRendererHandle {
   const renderer = new THREE.WebGLRenderer({
     canvas: options.canvas,
     antialias: options.antialias ?? true,
@@ -62,6 +64,7 @@ export function createThreeRenderer(options: ThreeRendererOptions): RendererPort
   let disposed = false;
 
   return {
+    getThreeRenderer: () => renderer,
     setSize(width, height) {
       size = { width, height };
       // updateStyle=false: the host controls the canvas CSS layout, not the renderer.

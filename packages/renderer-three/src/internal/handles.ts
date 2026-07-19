@@ -13,3 +13,8 @@ export interface ThreeCameraHandle {
   /** The underlying Three.js camera. */
   getThreeCamera(): THREE.Camera;
 }
+
+export interface ThreeRendererHandle {
+  /** The underlying Three.js WebGL renderer (needed for PMREM env-map baking). */
+  getThreeRenderer(): THREE.WebGLRenderer;
+}
