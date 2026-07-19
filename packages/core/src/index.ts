@@ -42,6 +42,9 @@ export type {
 export { createOrbitControls } from './controls';
 export type { OrbitControls, OrbitControlsOptions } from './controls';
 
+export { createRenderLoop } from './render';
+export type { RenderLoop, RenderLoopOptions, FrameScheduler, FrameRequestToken } from './render';
+
 export {
   lightingPresets,
   getLightingPreset,
