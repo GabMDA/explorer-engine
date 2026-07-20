@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0",
+  "meta": { "title": "Interactive Demo", "defaultLocale": "en" },
+  "model": { "src": "models/indexed.glb" },
+  "camera": { "controls": { "minDistance": 1, "maxDistance": 20 } },
+  "components": [
+    { "id": "crown", "label": "Crown", "nodes": [{ "explorerId": "crown" }] },
+    { "id": "gear-left", "label": "Gear (left)", "nodes": [{ "explorerId": "gear" }], "pickTarget": "gears" },
+    { "id": "gear-top", "label": "Gear (top)", "nodes": [{ "explorerId": "gear2" }], "pickTarget": "gears" },
+    {
+      "id": "gears",
+      "label": "Gears",
+      "nodes": [{ "explorerId": "gear" }, { "explorerId": "gear2" }],
+      "group": "internals"
+    }
+  ],
+  "hotspots": [
+    {
+      "id": "hs-crown",
+      "label": "Crown",
+      "anchor": { "kind": "component", "id": "crown" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "crown" } }
+    },
+    {
+      "id": "hs-gears",
+      "label": "Gears",
+      "anchor": { "kind": "component", "id": "gears" },
+      "action": { "type": "emit", "event": "gears:inspect" }
+    },
+    {
+      "id": "hs-base",
+      "label": "Base marker",
+      "anchor": { "kind": "position", "position": [0, -0.9, 0] },
+      "occludable": false,
+      "action": { "type": "emit", "event": "base:ping" }
+    }
+  ]
+}

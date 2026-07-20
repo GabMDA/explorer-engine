@@ -3,12 +3,16 @@
 // warnings (e.g. a node referenced by fragile name, ADR-003 / L12). Headless and
 // data-only. Deterministic — no schema library, full control over messages.
 import type {
+  Address,
   BackgroundConfig,
   CameraConfig,
   ComponentConfig,
   ConfigIssue,
   EnvironmentConfig,
   EnvironmentSourceId,
+  HotspotAction,
+  HotspotAnchor,
+  HotspotConfig,
   LightingConfig,
   LightingPresetId,
   MetaConfig,
@@ -34,6 +38,7 @@ const KNOWN_KEYS = new Set([
   'lighting',
   'camera',
   'components',
+  'hotspots',
 ]);
 const LIGHTING_PRESETS: readonly LightingPresetId[] = ['studio', 'outdoor', 'night'];
 const ENV_SOURCES: readonly EnvironmentSourceId[] = ['none', 'neutral-room'];
@@ -255,6 +260,12 @@ function validateComponents(ctx: Ctx, raw: unknown): ComponentConfig[] {
         if (ref) nodes.push(ref);
       });
     }
+    // pickTarget defaults to the component's own id ("self" granularity).
+    const pickTarget =
+      item['pickTarget'] === undefined || item['pickTarget'] === null
+        ? id
+        : ctx.str(item['pickTarget'], `${base}.pickTarget`, id);
+
     out.push({
       id,
       ...(item['label'] !== undefined
@@ -262,6 +273,7 @@ function validateComponents(ctx: Ctx, raw: unknown): ComponentConfig[] {
         : {}),
       nodes,
       selectable: ctx.bool(item['selectable'], `${base}.selectable`, true),
+      pickTarget,
       group:
         item['group'] === undefined || item['group'] === null
           ? null
@@ -269,6 +281,180 @@ function validateComponents(ctx: Ctx, raw: unknown): ComponentConfig[] {
     });
   });
   return out;
+}
+
+function validateAddress(ctx: Ctx, raw: unknown, path: string): Address | null {
+  if (!isObject(raw)) {
+    ctx.error(path, "must be a typed address { kind: 'component'|'group'|'node', id }");
+    return null;
+  }
+  const kind = raw['kind'];
+  if (kind !== 'component' && kind !== 'group' && kind !== 'node') {
+    ctx.error(`${path}.kind`, "must be one of 'component' | 'group' | 'node'");
+    return null;
+  }
+  if (!isString(raw['id']) || raw['id'].length === 0) {
+    ctx.error(`${path}.id`, 'is required and must be a non-empty string');
+    return null;
+  }
+  return { kind, id: raw['id'] };
+}
+
+function validateAnchor(ctx: Ctx, raw: unknown, path: string): HotspotAnchor | null {
+  if (!isObject(raw)) {
+    ctx.error(path, 'is required and must be a typed anchor object');
+    return null;
+  }
+  const kind = raw['kind'];
+  if (kind === 'component' || kind === 'group' || kind === 'node') {
+    if (!isString(raw['id']) || raw['id'].length === 0) {
+      ctx.error(`${path}.id`, 'is required and must be a non-empty string');
+      return null;
+    }
+    return { kind, id: raw['id'] };
+  }
+  if (kind === 'position') {
+    const pos = vec3(ctx, raw['position'], `${path}.position`);
+    if (pos === null) return null;
+    return { kind: 'position', position: pos };
+  }
+  ctx.error(`${path}.kind`, "must be one of 'component' | 'group' | 'node' | 'position'");
+  return null;
+}
+
+function vec3(ctx: Ctx, raw: unknown, path: string): readonly [number, number, number] | null {
+  if (Array.isArray(raw) && raw.length === 3) {
+    const [x, y, z] = raw as unknown[];
+    if (isNumber(x) && isNumber(y) && isNumber(z)) return [x, y, z];
+  }
+  ctx.error(path, 'must be a [number, number, number] tuple');
+  return null;
+}
+
+function validateAction(ctx: Ctx, raw: unknown, path: string): HotspotAction | null {
+  if (!isObject(raw)) {
+    ctx.error(path, 'must be an object with a `type`');
+    return null;
+  }
+  switch (raw['type']) {
+    case 'focus': {
+      const target = validateAddress(ctx, raw['target'], `${path}.target`);
+      return target ? { type: 'focus', target } : null;
+    }
+    case 'emit': {
+      if (!isString(raw['event']) || raw['event'].length === 0) {
+        ctx.error(`${path}.event`, 'is required and must be a non-empty string');
+        return null;
+      }
+      return { type: 'emit', event: raw['event'] };
+    }
+    case 'goToState': {
+      if (!isString(raw['state']) || raw['state'].length === 0) {
+        ctx.error(`${path}.state`, 'is required and must be a non-empty string');
+        return null;
+      }
+      return { type: 'goToState', state: raw['state'] };
+    }
+    default:
+      ctx.error(`${path}.type`, "must be one of 'focus' | 'emit' | 'goToState'");
+      return null;
+  }
+}
+
+function validateHotspots(ctx: Ctx, raw: unknown): HotspotConfig[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    ctx.error('hotspots', 'must be an array');
+    return [];
+  }
+  const out: HotspotConfig[] = [];
+  const seen = new Set<string>();
+  raw.forEach((item, i) => {
+    const base = `hotspots[${i}]`;
+    if (!isObject(item)) {
+      ctx.error(base, 'must be an object');
+      return;
+    }
+    if (!isString(item['id']) || item['id'].length === 0) {
+      ctx.error(`${base}.id`, 'is required and must be a non-empty string');
+      return;
+    }
+    const id = item['id'];
+    if (seen.has(id)) ctx.error(`${base}.id`, `duplicate hotspot id "${id}"`);
+    seen.add(id);
+
+    const anchor = validateAnchor(ctx, item['anchor'], `${base}.anchor`);
+    const action =
+      item['action'] === undefined
+        ? ({ type: 'emit', event: `hotspot:${id}` } as HotspotAction) // safe default
+        : validateAction(ctx, item['action'], `${base}.action`);
+    if (anchor === null || action === null) return;
+
+    let visibleInStates: readonly string[] | null = null;
+    if (item['visibleInStates'] !== undefined && item['visibleInStates'] !== null) {
+      if (!Array.isArray(item['visibleInStates']) || !item['visibleInStates'].every(isString)) {
+        ctx.error(`${base}.visibleInStates`, 'must be an array of state id strings');
+      } else {
+        visibleInStates = item['visibleInStates'];
+      }
+    }
+
+    out.push({
+      id,
+      label: ctx.str(item['label'], `${base}.label`, ''),
+      anchor,
+      offset:
+        item['offset'] === undefined || item['offset'] === null
+          ? null
+          : vec3(ctx, item['offset'], `${base}.offset`),
+      action,
+      visibleInStates,
+      occludable: ctx.bool(item['occludable'], `${base}.occludable`, true),
+      priority: ctx.num(item['priority'], `${base}.priority`, 0),
+    });
+  });
+  return out;
+}
+
+/**
+ * Config-level reference integrity (§5.6 rule 3): component `pickTarget`, hotspot
+ * component/group anchors and focus targets must point at declared entities.
+ * Node identities are checked against the GLB by the offline validator, not here.
+ */
+function validateReferences(
+  ctx: Ctx,
+  components: readonly ComponentConfig[],
+  hotspots: readonly HotspotConfig[],
+): void {
+  const componentIds = new Set(components.map((c) => c.id));
+  const groupIds = new Set(
+    components.map((c) => c.group).filter((g): g is string => g !== null && g.length > 0),
+  );
+
+  components.forEach((c, i) => {
+    if (c.pickTarget !== c.id && !componentIds.has(c.pickTarget)) {
+      ctx.error(`components[${i}].pickTarget`, `unknown component id "${c.pickTarget}"`);
+    }
+  });
+
+  const checkAddress = (addr: Address, path: string): void => {
+    if (addr.kind === 'component' && !componentIds.has(addr.id)) {
+      ctx.error(path, `unknown component id "${addr.id}"`);
+    } else if (addr.kind === 'group' && !groupIds.has(addr.id)) {
+      ctx.error(path, `unknown group id "${addr.id}"`);
+    }
+    // kind 'node' identities are validated against the model (validate-package).
+  };
+
+  hotspots.forEach((h, i) => {
+    const base = `hotspots[${i}]`;
+    if (h.anchor.kind === 'component' && !componentIds.has(h.anchor.id)) {
+      ctx.error(`${base}.anchor.id`, `unknown component id "${h.anchor.id}"`);
+    } else if (h.anchor.kind === 'group' && !groupIds.has(h.anchor.id)) {
+      ctx.error(`${base}.anchor.id`, `unknown group id "${h.anchor.id}"`);
+    }
+    if (h.action.type === 'focus') checkAddress(h.action.target, `${base}.action.target`);
+  });
 }
 
 /** Validate `raw` against the schema, applying defaults. Does not migrate (see migrateConfig). */
@@ -299,6 +485,10 @@ export function validateConfig(raw: unknown): ValidationResult {
     if (!KNOWN_KEYS.has(key)) ctx.warn(key, `unknown top-level key "${key}" (ignored)`);
   }
 
+  const components = validateComponents(ctx, raw['components']);
+  const hotspots = validateHotspots(ctx, raw['hotspots']);
+  validateReferences(ctx, components, hotspots);
+
   const resolved: ResolvedConfig = {
     schemaVersion: isString(version) ? version : '',
     meta: validateMeta(ctx, raw['meta']),
@@ -306,7 +496,8 @@ export function validateConfig(raw: unknown): ValidationResult {
     environment: validateEnvironment(ctx, raw['environment']),
     lighting: validateLighting(ctx, raw['lighting']),
     camera: validateCamera(ctx, raw['camera']),
-    components: validateComponents(ctx, raw['components']),
+    components,
+    hotspots,
   };
 
   if (ctx.errors.length > 0) return { ok: false, errors: ctx.errors, warnings: ctx.warnings };

@@ -18,3 +18,15 @@ export type { ModelLoaderOptions } from './model-loader';
 
 export { createNodeIndex } from './node-index';
 export type { NodeIndex } from './node-index';
+
+export { createRenderStateApplicator } from './render-state-applicator';
+export type {
+  RenderStateApplicator,
+  RenderStateApplicatorOptions,
+} from './render-state-applicator';
+
+export { createRaycasterAdapter } from './raycaster';
+export type { RaycasterAdapterOptions } from './raycaster';
+
+export { createHotspotProjector } from './hotspot-projector';
+export type { HotspotProjectorOptions } from './hotspot-projector';

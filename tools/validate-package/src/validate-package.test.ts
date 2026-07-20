@@ -106,6 +106,29 @@ describe('validatePackage', () => {
     expect(report.errors.some((e) => e.message.includes('explorerId "missing"'))).toBe(true);
   });
 
+  it('detects a hotspot node anchor / focus target missing from the model', () => {
+    const cfg = JSON.stringify({
+      schemaVersion: '1.0',
+      model: { src: 'models/m.glb' },
+      components: [{ id: 'crown', nodes: [{ explorerId: 'crown' }] }],
+      hotspots: [
+        { id: 'ok', anchor: { kind: 'node', id: 'crown' } },
+        { id: 'bad-anchor', anchor: { kind: 'node', id: 'ghost' } },
+        {
+          id: 'bad-focus',
+          anchor: { kind: 'component', id: 'crown' },
+          action: { type: 'focus', target: { kind: 'node', id: 'phantom' } },
+        },
+      ],
+    });
+    const report = validatePackage(memFs({ 'config.json': cfg, 'models/m.glb': glbWithNodes }));
+    expect(report.ok).toBe(false);
+    expect(report.errors.some((e) => e.path === 'hotspots[1].anchor.id')).toBe(true);
+    expect(report.errors.some((e) => e.path === 'hotspots[2].action.target.id')).toBe(true);
+    // The valid node anchor produces no error.
+    expect(report.errors.some((e) => e.path === 'hotspots[0].anchor.id')).toBe(false);
+  });
+
   it('warns on a name-referenced node that exists, errors on one that does not', () => {
     const ok = JSON.stringify({
       schemaVersion: '1.0',

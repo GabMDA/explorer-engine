@@ -5,6 +5,7 @@
 // The bus is compile-time checked against this map.
 import type { BoundingBox } from '../ports/scene-port';
 import type { ModelLoadPhase } from '../model/model-loader-port';
+import type { HotspotAction } from '@explorer-engine/schema';
 
 export interface EngineDisposedEvent {
   /** Epoch milliseconds at which disposal occurred. */
@@ -29,9 +30,35 @@ export interface ModelErrorEvent {
   readonly message: string;
 }
 
+/** Selection changed to a component (P4-T1). Discrete — never per-frame (L11). */
+export interface SelectionChangedEvent {
+  readonly component: string;
+}
+
+/** Hover moved to a component, or cleared (`null`). Discrete (L11). */
+export interface SelectionHoverEvent {
+  readonly component: string | null;
+}
+
+/** A hotspot was activated; carries its typed config action (P4-T4). */
+export interface HotspotActivatedEvent {
+  readonly id: string;
+  readonly action: HotspotAction;
+}
+
+/** Hover moved to a hotspot, or cleared (`null`). Discrete (L11). */
+export interface HotspotHoverEvent {
+  readonly id: string | null;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
   'model:loaded': ModelLoadedEvent;
   'model:error': ModelErrorEvent;
+  'selection:changed': SelectionChangedEvent;
+  'selection:cleared': Record<string, never>;
+  'selection:hover': SelectionHoverEvent;
+  'hotspot:activated': HotspotActivatedEvent;
+  'hotspot:hover': HotspotHoverEvent;
 }

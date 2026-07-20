@@ -102,9 +102,70 @@ export type {
   CameraControlsConfig,
   ComponentConfig,
   NodeRef,
+  Address,
+  HotspotAnchor,
+  HotspotAction,
+  HotspotConfig,
   ConfigIssue,
   ValidationResult,
 } from '@explorer-engine/schema';
+
+// Render State Resolver (chapter 19, ADR-001) — the single authority over visual state.
+export {
+  createRenderStateResolver,
+  createComponentModel,
+  nodeRefIdentity,
+  composeVisualState,
+  visualStateEquals,
+  isVisualChannel,
+  isIntentChannel,
+  REST_VISUAL_STATE,
+} from './render-state';
+export type {
+  RenderStateResolver,
+  RenderStateResolverOptions,
+  RenderLayer,
+  LayerHandle,
+  LayerSource,
+  ResolvedIntent,
+  ComponentModel,
+  RenderStatePort,
+  NodeStateUpdate,
+  Channel,
+  VisualChannel,
+  IntentChannel,
+  ChannelValueMap,
+  TransformValue,
+  ColorOverrideValue,
+  OutlineValue,
+  VisibilityValue,
+  CameraIntentValue,
+  LightingIntentValue,
+  EffectiveVisualState,
+  VisualContribution,
+} from './render-state';
+
+// Selection Manager (P4-T1).
+export { createSelectionManager } from './selection';
+export type {
+  SelectionManager,
+  SelectionManagerOptions,
+  SelectionStyle,
+  RaycasterPort,
+  PickHit,
+} from './selection';
+
+// Hotspot Manager (P4-T2..T4).
+export { createHotspotManager } from './hotspots';
+export type {
+  HotspotManager,
+  HotspotManagerOptions,
+  HotspotView,
+  HotspotVisualState,
+  ProjectionPort,
+  AnchorSpec,
+  ProjectionResult,
+} from './hotspots';
 
 export type {
   EngineEventMap,
@@ -112,4 +173,8 @@ export type {
   ModelLoadingEvent,
   ModelLoadedEvent,
   ModelErrorEvent,
+  SelectionChangedEvent,
+  SelectionHoverEvent,
+  HotspotActivatedEvent,
+  HotspotHoverEvent,
 } from './types/events';

@@ -55,12 +55,60 @@ export interface CameraConfig {
 /** A reference to a model node — `explorerId` recommended, `name` = fragile fallback. */
 export type NodeRef = { readonly explorerId: string } | { readonly name: string };
 
+/**
+ * Typed target address (chapter 05 §5.4, C5 / L13). Replaces the v1 string
+ * prefixes (`"group:internals"`). Used by hotspots/states/focus/plugins to point
+ * at a logical entity. For `kind: 'node'`, `id` is a node identity (explorerId
+ * preferred, node name as fragile fallback).
+ */
+export interface Address {
+  readonly kind: 'component' | 'group' | 'node';
+  readonly id: string;
+}
+
 export interface ComponentConfig {
   readonly id: string;
   readonly label?: string;
   readonly nodes: readonly NodeRef[];
   readonly selectable: boolean;
+  /**
+   * Pick granularity (chapter 05 §5.3.7): the component id a click on this
+   * component resolves to. Defaults to the component's own id (`self`).
+   */
+  readonly pickTarget: string;
   readonly group: string | null;
+}
+
+/** Hotspot anchoring (chapter 07 §7.2.2, chapter 05 §5.3.8). Typed (C5). */
+export type HotspotAnchor =
+  | { readonly kind: 'component'; readonly id: string }
+  | { readonly kind: 'group'; readonly id: string }
+  | { readonly kind: 'node'; readonly id: string }
+  | { readonly kind: 'position'; readonly position: readonly [number, number, number] };
+
+/**
+ * What a hotspot does on activation (chapter 05 §5.3.8, chapter 07 §7.5.2). The
+ * subset the engine consumes today; extended additively as modules land. Camera
+ * focus and state changes resolve through the same typed addresses/ids.
+ */
+export type HotspotAction =
+  | { readonly type: 'focus'; readonly target: Address }
+  | { readonly type: 'emit'; readonly event: string }
+  | { readonly type: 'goToState'; readonly state: string };
+
+export interface HotspotConfig {
+  readonly id: string;
+  readonly label: string;
+  readonly anchor: HotspotAnchor;
+  /** Optional constant offset from the anchor, in model space. */
+  readonly offset: readonly [number, number, number] | null;
+  readonly action: HotspotAction;
+  /** States this hotspot is visible in; `null` = all states. */
+  readonly visibleInStates: readonly string[] | null;
+  /** Hide/dim when occluded by geometry (chapter 07 §7.4). */
+  readonly occludable: boolean;
+  /** Overlap/clustering resolution order (chapter 07 §7.6.2). */
+  readonly priority: number;
 }
 
 /**
@@ -75,6 +123,7 @@ export interface ResolvedConfig {
   readonly lighting: LightingConfig;
   readonly camera: CameraConfig;
   readonly components: readonly ComponentConfig[];
+  readonly hotspots: readonly HotspotConfig[];
 }
 
 /** A single validation problem, addressed by a JSON-ish path. */

@@ -109,6 +109,8 @@ export function validatePackage(fs: PackageFs, configPath = 'config.json'): Pack
   }
   const nameSet = new Set(ids.names);
   const idSet = new Set(ids.explorerIds);
+  const knownIdentity = (identity: string) => idSet.has(identity) || nameSet.has(identity);
+
   config.components.forEach((component, i) => {
     component.nodes.forEach((node, j) => {
       const path = `components[${i}].nodes[${j}]`;
@@ -120,6 +122,27 @@ export function validatePackage(fs: PackageFs, configPath = 'config.json'): Pack
         errors.push({ path, message: `node name "${node.name}" not found in model` });
       }
     });
+  });
+
+  // Hotspot node anchors / focus targets must also resolve to a real GLB node
+  // (component/group references were already checked by the schema validator).
+  config.hotspots.forEach((hotspot, i) => {
+    if (hotspot.anchor.kind === 'node' && !knownIdentity(hotspot.anchor.id)) {
+      errors.push({
+        path: `hotspots[${i}].anchor.id`,
+        message: `node "${hotspot.anchor.id}" not found in model`,
+      });
+    }
+    if (
+      hotspot.action.type === 'focus' &&
+      hotspot.action.target.kind === 'node' &&
+      !knownIdentity(hotspot.action.target.id)
+    ) {
+      errors.push({
+        path: `hotspots[${i}].action.target.id`,
+        message: `node "${hotspot.action.target.id}" not found in model`,
+      });
+    }
   });
 
   return { ok: errors.length === 0, errors, warnings };
