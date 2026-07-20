@@ -1,15 +1,15 @@
-// Explorer Engine — development playground (Sprint 2: interaction + RSR).
+// Explorer Engine — development playground (Sprint 3: focus + animation).
 //
 // The playground is a GENERIC composition root: it fetches a config.json through
 // the Config Loader (core), then builds the scene ENTIRELY from that resolved
-// config — lighting, environment, camera, controls, model, AND the interaction
-// stack (Render State Resolver, Selection, Hotspots). There is no object-specific
-// code: the same code drives any config (proof of L1/L2). It imports no Three.js
-// and parses no GLB itself.
+// config — lighting, environment, camera, controls, model, AND the interaction +
+// focus/animation stack (Render State Resolver, Animation Engine, Selection,
+// Hotspots, Focus Manager, camera intent controller). There is no object-specific
+// code: the same code drives any config (proof of L1/L2).
 //
 //   ?config=minimal      minimal single-cube config (default)
 //   ?config=indexed      multi-node model, exercises the node index (P2-T4)
-//   ?config=interactive  components + hotspots, exercises Sprint 2 (selection/RSR/hotspots)
+//   ?config=interactive  components + hotspots + focus, exercises Sprint 2/3
 import {
   createOrbitControls,
   getLightingPreset,
@@ -22,6 +22,8 @@ import {
   createRenderStateResolver,
   createSelectionManager,
   createHotspotManager,
+  createAnimationEngine,
+  createFocusManager,
   EventBus,
   type EngineEventMap,
   type ResolvedConfig,
@@ -36,10 +38,15 @@ import {
   createRenderStateApplicator,
   createRaycasterAdapter,
   createHotspotProjector,
+  createBoundsProvider,
+  createCameraIntentController,
+  type CameraIntentController,
 } from '@explorer-engine/renderer-three';
 import { createFetchTransport } from '@explorer-engine/resource-fetch';
 import { createDomInput } from '@explorer-engine/input-dom';
 import { createHotspotOverlay } from './hotspot-overlay';
+
+const DEG2RAD = Math.PI / 180;
 
 const CONFIG_PATH = ((): string => {
   const which = new URLSearchParams(window.location.search).get('config');
@@ -55,7 +62,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
   app.appendChild(canvas);
   const caption = document.createElement('p');
   caption.className = 'caption';
-  caption.textContent = 'Explorer Engine — Sprint 2 · loading config…';
+  caption.textContent = 'Explorer Engine — Sprint 3 · loading config…';
   document.body.appendChild(caption);
 
   const renderer = createThreeRenderer({ canvas, toneMapping: 'aces-filmic' });
@@ -105,15 +112,50 @@ async function boot(app: HTMLDivElement): Promise<void> {
   });
 
   const events = new EventBus<EngineEventMap>();
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // 3. Interaction stack (Sprint 2). All visual state flows through the resolver (L5).
+  // 3. Interaction + focus/animation stack. All visual state flows through the
+  // resolver (L5); every animation goes through the headless Animation Engine.
   const components = createComponentModel(config);
   const applicator = createRenderStateApplicator({ scene });
   let renderCount = 0;
   const wake = () => loop.requestRender();
-  const resolver = createRenderStateResolver({ components, port: applicator, requestRender: wake });
+  const engine = createAnimationEngine({ requestRender: wake, reducedMotion });
+  // Holder for the forward-referenced camera adapter (created after the resolver,
+  // which it depends on; the resolver only needs a callback into it).
+  const cam: { controller?: CameraIntentController } = {};
+  const resolver = createRenderStateResolver({
+    components,
+    port: applicator,
+    requestRender: wake,
+    animation: engine, // enables layer `transition`s (dim fade)
+    onIntentChange: () => cam.controller?.sync(), // camera adapter executes cameraIntent
+  });
   const raycaster = createRaycasterAdapter({ scene, camera });
   const selection = createSelectionManager({ components, resolver, raycaster, events });
+
+  // Focus Manager (headless) → publishes cameraIntent + dim/outline layers.
+  const boundsProvider = createBoundsProvider({ scene, components });
+  const focus = createFocusManager({
+    resolver,
+    components,
+    config: config.focus,
+    boundsProvider,
+    frameHint: () => ({
+      fovYRadians: config.camera.fov * DEG2RAD,
+      aspect: window.innerWidth / Math.max(1, window.innerHeight),
+    }),
+    events,
+  });
+  // Camera adapter: consumes cameraIntent, animates the camera via the engine.
+  cam.controller = createCameraIntentController({
+    resolver,
+    camera,
+    controls,
+    animation: engine,
+    transition: config.focus.transition,
+    requestRender: wake,
+  });
 
   const hotspots = createHotspotManager({ config, components, events });
   const projector = createHotspotProjector({ scene, camera, renderer });
@@ -127,19 +169,22 @@ async function boot(app: HTMLDivElement): Promise<void> {
         })
       : null;
 
-  // React to interaction events (typed bus). In Sprint 2 a hotspot `focus` action
-  // is demonstrated by selecting its target component (Focus Manager lands in P5).
+  // React to interaction events (typed bus). A hotspot `focus` action now drives
+  // the Focus Manager (camera transition + dim/outline); `emit` is just reported.
   events.on('selection:changed', (e) => (caption.textContent = `Selected: ${e.component}`));
-  events.on('selection:cleared', () => (caption.textContent = `Selection cleared`));
+  events.on('focus:started', (e) => (caption.textContent = `Focus → ${e.target.id} · Esc = back`));
+  events.on('focus:ended', (e) => {
+    caption.textContent = e.current ? `Focus → ${e.current.id} · Esc = back` : `Overview`;
+  });
   events.on('hotspot:activated', (e) => {
-    if (e.action.type === 'focus' && e.action.target.kind === 'component') {
-      selection.selectComponent(e.action.target.id);
-    }
-    caption.textContent = `Hotspot ${e.id} → ${e.action.type}`;
+    if (e.action.type === 'focus') focus.focus(e.action.target);
+    else caption.textContent = `Hotspot ${e.id} → ${e.action.type}`;
     wake();
   });
 
-  // On-demand render loop (P1-T5): compose visual state, project hotspots, draw.
+  // On-demand render loop (P1-T5): advance animations, compose visual state, project
+  // hotspots, draw. The loop stays alive while an animation is active, then goes
+  // dormant (frame ownership, chapter 11 §11.8.1 / L18) — no permanent 60 FPS loop.
   const loop = createRenderLoop({
     scheduler: {
       request: (cb) => requestAnimationFrame(cb),
@@ -147,6 +192,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
     },
     render: () => {
       renderCount += 1;
+      engine.update(performance.now()); // advance tweens/timelines (camera + RSR fades)
       const moving = controls.update();
       resolver.flush(); // push composed visual state to the applicator (dirty only)
       if (overlay) {
@@ -154,7 +200,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
         overlay.update(hotspots.view());
       }
       renderer.render(scene, camera);
-      if (moving) loop.requestRender();
+      if (moving || engine.hasActive) loop.requestRender();
     },
   });
 
@@ -199,6 +245,15 @@ async function boot(app: HTMLDivElement): Promise<void> {
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
 
+  // Escape exits the current focus level (chapter 08 §8.10 — keyboard exit).
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && focus.depth > 0) {
+      focus.back();
+      wake();
+    }
+  };
+  window.addEventListener('keydown', onKeyDown);
+
   window.addEventListener('resize', resize);
   resize();
   canvas.focus();
@@ -224,7 +279,11 @@ async function boot(app: HTMLDivElement): Promise<void> {
     .then(() => {
       const n = scene.getNodeIndex()?.size ?? 0;
       const hs = hotspots.count;
-      caption.textContent = `Explorer Engine — ${config.meta.title ?? 'model'} · ${n} node(s) · ${hs} hotspot(s) · click = select, drag = orbit`;
+      // Seed the camera "home" pose from the auto-framing, so exiting a focus
+      // returns to the overview (recomposition, not imperative restore).
+      const view = controls.getView();
+      cam.controller?.setHome(view.position, view.target);
+      caption.textContent = `Explorer Engine — ${config.meta.title ?? 'model'} · ${n} node(s) · ${hs} hotspot(s) · hotspot = focus, Esc = back`;
       wake();
     })
     .catch((error: unknown) => {
@@ -234,6 +293,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
   const teardown = () => {
     loop.dispose();
     window.removeEventListener('resize', resize);
+    window.removeEventListener('keydown', onKeyDown);
     canvas.removeEventListener('pointerdown', onPointerDown);
     canvas.removeEventListener('pointermove', onPointerMove);
     canvas.removeEventListener('pointerup', onPointerUp);
@@ -241,6 +301,9 @@ async function boot(app: HTMLDivElement): Promise<void> {
     controls.dispose();
     modelLoader.dispose();
     overlay?.dispose();
+    focus.dispose();
+    cam.controller?.dispose();
+    engine.dispose();
     selection.dispose();
     resolver.dispose();
     applicator.dispose();
@@ -286,6 +349,16 @@ async function boot(app: HTMLDivElement): Promise<void> {
       effectiveState: (identity: string) => resolver.resolveNode(identity),
       layerCount: () => resolver.layerCount,
       flush: () => resolver.flush(),
+      // Sprint 3 focus / animation hooks.
+      focusComponent: (id: string) => focus.focus({ kind: 'component', id }),
+      back: () => focus.back(),
+      clearFocus: () => focus.clear(),
+      focusDepth: () => focus.depth,
+      focusTarget: () => focus.getCurrent(),
+      cameraIntent: () => resolver.getCameraIntent(),
+      cameraPose: () => cam.controller?.getView(),
+      cameraTransitioning: () => cam.controller?.isTransitioning() ?? false,
+      engineActive: () => engine.hasActive,
       teardown,
     };
   }

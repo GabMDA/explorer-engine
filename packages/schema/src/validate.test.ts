@@ -160,6 +160,44 @@ describe('validateConfig', () => {
     expect(r.errors.some((e) => e.path === 'hotspots[3].anchor.kind')).toBe(true);
   });
 
+  it('defaults the focus section and accepts a custom, valid focus config', () => {
+    const def = validateConfig(minimal);
+    expect(def.value?.focus.padding).toBe(1.2); // default
+    expect(def.value?.focus.transition).toEqual({ duration: 600, easing: 'easeInOut', delay: 0 });
+
+    const custom = validateConfig({
+      schemaVersion: '1.0',
+      model: { src: 'm.glb' },
+      focus: {
+        padding: 1.5,
+        dimOthers: false,
+        isolate: true,
+        outline: { color: '#ff0000', thickness: 2 },
+        transition: { duration: 300, easing: 'easeOutCubic', delay: 50 },
+      },
+    });
+    expect(custom.ok).toBe(true);
+    expect(custom.value?.focus.isolate).toBe(true);
+    expect(custom.value?.focus.outline).toEqual({ enabled: true, color: '#ff0000', thickness: 2 });
+    expect(custom.value?.focus.transition).toEqual({
+      duration: 300,
+      easing: 'easeOutCubic',
+      delay: 50,
+    });
+  });
+
+  it('rejects an unknown easing and clamps an out-of-range dimOpacity with a warning', () => {
+    const r = validateConfig({
+      schemaVersion: '1.0',
+      model: { src: 'm.glb' },
+      focus: { dimOpacity: 5, transition: { duration: 100, easing: 'disco' } },
+    });
+    expect(r.ok).toBe(false); // unknown easing is a blocking error
+    expect(r.errors.some((e) => e.path === 'focus.transition.easing')).toBe(true);
+    // dimOpacity 5 → clamped to 1 with a warning (non-blocking).
+    expect(r.warnings.some((w) => w.path === 'focus.dimOpacity')).toBe(true);
+  });
+
   it('rejects a duplicate hotspot id and a focus action targeting an unknown component', () => {
     const r = validateConfig({
       schemaVersion: '1.0',

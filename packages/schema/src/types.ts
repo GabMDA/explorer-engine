@@ -52,6 +52,60 @@ export interface CameraConfig {
   readonly controls: CameraControlsConfig;
 }
 
+/**
+ * Bounded set of easing names (chapter 11 §11.4). Referenced by name in config
+ * transitions; validated against this closed set. Extended additively.
+ */
+export type EaseName =
+  | 'linear'
+  | 'easeIn'
+  | 'easeOut'
+  | 'easeInOut'
+  | 'easeInQuad'
+  | 'easeOutQuad'
+  | 'easeInOutQuad'
+  | 'easeInCubic'
+  | 'easeOutCubic'
+  | 'easeInOutCubic'
+  | 'easeInBack'
+  | 'easeOutBack'
+  | 'easeOutElastic'
+  | 'easeOutBounce';
+
+/**
+ * A resolved transition spec (chapter 05 §5.4). Durations/delays are in ms and
+ * always ≥ 0 after validation; `easing` is a valid {@link EaseName}.
+ */
+export interface TransitionSpec {
+  readonly duration: number;
+  readonly easing: EaseName;
+  readonly delay: number;
+}
+
+/** Resolved outline style for focus highlighting (chapter 08 §8.4). */
+export interface FocusOutlineConfig {
+  readonly enabled: boolean;
+  readonly color: string;
+  readonly thickness: number;
+}
+
+/**
+ * Resolved global Focus settings (chapter 05 §5.3.10, chapter 08 §8.9). The v1
+ * `restoreOnExit` is gone — focus return is intrinsic to layer removal (C1/C4).
+ */
+export interface FocusConfig {
+  /** Framing zoom-out margin around the target (> 1). */
+  readonly padding: number;
+  /** Dim the rest of the scene while focused. */
+  readonly dimOthers: boolean;
+  /** Opacity applied to non-targeted components when dimming (∈ [0,1]). */
+  readonly dimOpacity: number;
+  readonly outline: FocusOutlineConfig;
+  /** Fully hide (instead of dim) the rest of the scene. */
+  readonly isolate: boolean;
+  readonly transition: TransitionSpec;
+}
+
 /** A reference to a model node — `explorerId` recommended, `name` = fragile fallback. */
 export type NodeRef = { readonly explorerId: string } | { readonly name: string };
 
@@ -124,6 +178,7 @@ export interface ResolvedConfig {
   readonly camera: CameraConfig;
   readonly components: readonly ComponentConfig[];
   readonly hotspots: readonly HotspotConfig[];
+  readonly focus: FocusConfig;
 }
 
 /** A single validation problem, addressed by a JSON-ish path. */

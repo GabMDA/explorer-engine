@@ -6,6 +6,9 @@ import type {
   LightingConfig,
   CameraConfig,
   CameraControlsConfig,
+  EaseName,
+  TransitionSpec,
+  FocusConfig,
 } from './types';
 
 /** The schema version this build implements. */
@@ -42,3 +45,37 @@ export const MODEL_DEFAULTS = {
   meshopt: true,
   frameOnLoad: true,
 } as const;
+
+/** All valid easing names (chapter 11 §11.4), for validation of the closed set. */
+export const EASE_NAMES: readonly EaseName[] = [
+  'linear',
+  'easeIn',
+  'easeOut',
+  'easeInOut',
+  'easeInQuad',
+  'easeOutQuad',
+  'easeInOutQuad',
+  'easeInCubic',
+  'easeOutCubic',
+  'easeInOutCubic',
+  'easeInBack',
+  'easeOutBack',
+  'easeOutElastic',
+  'easeOutBounce',
+];
+
+/** Default focus transition (chapter 05 §5.3.10): 600 ms easeInOut. */
+export const DEFAULT_FOCUS_TRANSITION: TransitionSpec = {
+  duration: 600,
+  easing: 'easeInOut',
+  delay: 0,
+};
+
+export const DEFAULT_FOCUS: FocusConfig = {
+  padding: 1.2,
+  dimOthers: true,
+  dimOpacity: 0.15,
+  outline: { enabled: true, color: '#3ba7ff', thickness: 1 },
+  isolate: false,
+  transition: DEFAULT_FOCUS_TRANSITION,
+};

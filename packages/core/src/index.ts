@@ -106,9 +106,15 @@ export type {
   HotspotAnchor,
   HotspotAction,
   HotspotConfig,
+  EaseName,
+  TransitionSpec,
+  FocusOutlineConfig,
+  FocusConfig,
   ConfigIssue,
   ValidationResult,
 } from '@explorer-engine/schema';
+// Re-export the schema's data-only default values used by adapters/hosts.
+export { DEFAULT_FOCUS, DEFAULT_FOCUS_TRANSITION, EASE_NAMES } from '@explorer-engine/schema';
 
 // Render State Resolver (chapter 19, ADR-001) — the single authority over visual state.
 export {
@@ -116,6 +122,7 @@ export {
   createComponentModel,
   nodeRefIdentity,
   composeVisualState,
+  interpolateVisualState,
   visualStateEquals,
   isVisualChannel,
   isIntentChannel,
@@ -145,6 +152,42 @@ export type {
   VisualContribution,
 } from './render-state';
 
+// Animation Engine (chapter 11, P5-T1/T2).
+export {
+  createAnimationEngine,
+  createTween,
+  numberTween,
+  vec3Tween,
+  createTimeline,
+  sequence,
+  parallel,
+  resolveEasing,
+  EASINGS,
+  lerp,
+  lerpVec3,
+  clamp01,
+} from './animation';
+export type {
+  AnimationEngine,
+  AnimationEngineOptions,
+  PlaybackHandle,
+  PlaybackState,
+  PlayOptions,
+  Animation,
+  TweenSpec,
+  TimelineEntry,
+} from './animation';
+
+// Focus Manager (chapter 08, P5-T4).
+export { createFocusManager } from './focus';
+export type {
+  FocusManager,
+  FocusManagerOptions,
+  BoundsProvider,
+  FrameHint,
+  FocusFrameOptions,
+} from './focus';
+
 // Selection Manager (P4-T1).
 export { createSelectionManager } from './selection';
 export type {
@@ -173,6 +216,8 @@ export type {
   ModelLoadingEvent,
   ModelLoadedEvent,
   ModelErrorEvent,
+  FocusStartedEvent,
+  FocusEndedEvent,
   SelectionChangedEvent,
   SelectionHoverEvent,
   HotspotActivatedEvent,

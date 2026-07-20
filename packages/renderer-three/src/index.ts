@@ -30,3 +30,12 @@ export type { RaycasterAdapterOptions } from './raycaster';
 
 export { createHotspotProjector } from './hotspot-projector';
 export type { HotspotProjectorOptions } from './hotspot-projector';
+
+export { createBoundsProvider } from './bounds-provider';
+export type { BoundsProviderOptions } from './bounds-provider';
+
+export { createCameraIntentController } from './camera-intent-controller';
+export type {
+  CameraIntentController,
+  CameraIntentControllerOptions,
+} from './camera-intent-controller';

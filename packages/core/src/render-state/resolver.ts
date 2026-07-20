@@ -13,11 +13,14 @@
 // Headless & data-only (L8/L9). The camera/lighting INTENT channels are exclusive
 // and global; they are resolved and queryable here for the Focus/State managers
 // that land later — the resolver already owns the contract.
-import type { Address } from '@explorer-engine/schema';
+import type { Address, TransitionSpec } from '@explorer-engine/schema';
 import type { ComponentModel } from './component-model';
 import type { RenderStatePort, NodeStateUpdate } from './render-state-port';
+import { createTween } from '../animation/tween';
+import type { AnimationEngine, PlaybackHandle } from '../animation/engine';
 import {
   composeVisualState,
+  interpolateVisualState,
   isIntentChannel,
   visualStateEquals,
   REST_VISUAL_STATE,
@@ -41,6 +44,14 @@ export interface RenderLayer<C extends Channel = Channel> {
   readonly value: ChannelValueMap[C];
   /** Departs ties on `(target, channel)`. Defaults to the source's normative band. */
   readonly priority?: number;
+  /**
+   * How the affected nodes reach their new composed state (chapter 19 §19.4 step 4).
+   * Requires an Animation Engine on the resolver; continuous channels (opacity,
+   * transform) interpolate, discrete channels snap. Omitted ⇒ IMMEDIATE application
+   * (unchanged behaviour). Applies to visual channels only — camera/lighting intent
+   * transitions are executed by their adapter.
+   */
+  readonly transition?: TransitionSpec;
 }
 
 /** Opaque handle to a published layer; pass it back to update/remove the layer. */
@@ -62,6 +73,8 @@ export interface RenderStateResolverOptions {
   readonly requestRender?: () => void;
   /** Notified when the winning camera/lighting intent changes (for P5/P6 adapters). */
   readonly onIntentChange?: () => void;
+  /** Enables layer `transition`s (interpolation). Omit ⇒ everything is immediate. */
+  readonly animation?: AnimationEngine;
 }
 
 export interface RenderStateResolver {
@@ -94,6 +107,12 @@ interface StoredLayer {
   readonly seq: number;
   /** Node identities the target expands to (empty for intent layers). */
   readonly identities: readonly string[];
+  readonly transition?: TransitionSpec;
+}
+
+interface ActiveTransition {
+  handle: PlaybackHandle | null;
+  current: EffectiveVisualState;
 }
 
 /** Normative default priority bands (chapter 19 §19.6). */
@@ -120,17 +139,42 @@ export function createRenderStateResolver(
   const { components, port } = options;
   const requestRender = options.requestRender ?? (() => {});
   const onIntentChange = options.onIntentChange ?? (() => {});
+  const animation = options.animation;
 
   const layers = new Map<number, StoredLayer>();
   const visualLayersByIdentity = new Map<string, Set<number>>();
+  /** Nodes whose COMPOSITION changed (a layer was added/updated/removed). */
   const dirty = new Set<string>();
+  /** Nodes whose in-flight transition advanced this frame (tween ticks). */
+  const animating = new Set<string>();
   const lastPushed = new Map<string, EffectiveVisualState>();
+  /** Transition spec to apply to a node's NEXT recomposition (consumed by flush). */
+  const pendingTransition = new Map<string, TransitionSpec>();
+  /** In-flight per-node transitions (interpolation state). */
+  const activeTransitions = new Map<string, ActiveTransition>();
   let nextId = 1;
   let seq = 0;
   let disposed = false;
 
   const markDirty = (identities: readonly string[]) => {
     for (const identity of identities) dirty.add(identity);
+  };
+
+  const markAnimating = (identity: string) => {
+    animating.add(identity);
+  };
+
+  const scheduleTransition = (identities: readonly string[], spec: TransitionSpec | undefined) => {
+    if (!spec || !animation) return;
+    for (const identity of identities) pendingTransition.set(identity, spec);
+  };
+
+  const cancelTransition = (identity: string) => {
+    const active = activeTransitions.get(identity);
+    if (active) {
+      active.handle?.cancel();
+      activeTransitions.delete(identity);
+    }
   };
 
   const indexVisual = (layer: StoredLayer) => {
@@ -173,6 +217,53 @@ export function createRenderStateResolver(
   const resolveNode = (identity: string): EffectiveVisualState =>
     composeVisualState(contributionsFor(identity));
 
+  /**
+   * Begin (or replace) an interpolated transition toward `target` for a node, and
+   * return the state to push THIS frame (the current displayed value). Requires an
+   * animation engine. Continuous channels lerp; discrete channels snap (chapter 19).
+   */
+  const startTransition = (
+    identity: string,
+    target: EffectiveVisualState,
+    spec: TransitionSpec,
+  ): EffectiveVisualState => {
+    const engine = animation;
+    if (!engine) return target;
+    const existing = activeTransitions.get(identity);
+    const from = existing ? existing.current : (lastPushed.get(identity) ?? REST_VISUAL_STATE);
+    // Already there → cancel any in-flight transition and snap.
+    if (visualStateEquals(from, target)) {
+      cancelTransition(identity);
+      return target;
+    }
+    if (existing) existing.handle?.cancel();
+    const entry: ActiveTransition = { handle: null, current: from };
+    activeTransitions.set(identity, entry);
+
+    const tween = createTween<number>({
+      from: 0,
+      to: 1,
+      duration: spec.duration,
+      delay: spec.delay,
+      easing: spec.easing,
+      interpolate: (a, b, t) => a + (b - a) * t,
+      onUpdate: (p) => {
+        entry.current = interpolateVisualState(from, target, p);
+        markAnimating(identity);
+        requestRender();
+      },
+    });
+    entry.handle = engine.play(tween, {
+      onComplete: () => {
+        entry.current = target;
+        activeTransitions.delete(identity);
+        markAnimating(identity);
+        requestRender();
+      },
+    });
+    return entry.current; // seek(0) already ran → the from-ish start state
+  };
+
   const resolveIntent = <V>(channel: Channel): ResolvedIntent<V> | null => {
     let best: StoredLayer | null = null;
     for (const layer of layers.values()) {
@@ -201,12 +292,14 @@ export function createRenderStateResolver(
         priority: layer.priority ?? defaultPriorityFor(layer.source),
         seq: seq++,
         identities: isIntentChannel(layer.channel) ? [] : components.expand(layer.target),
+        ...(layer.transition ? { transition: layer.transition } : {}),
       };
       layers.set(id, stored);
       if (isIntentChannel(stored.channel)) {
         onIntentChange();
       } else {
         indexVisual(stored);
+        scheduleTransition(stored.identities, stored.transition);
         markDirty(stored.identities);
       }
       requestRender();
@@ -218,7 +311,10 @@ export function createRenderStateResolver(
       if (!layer) return;
       layer.value = value;
       if (isIntentChannel(layer.channel)) onIntentChange();
-      else markDirty(layer.identities);
+      else {
+        scheduleTransition(layer.identities, layer.transition);
+        markDirty(layer.identities);
+      }
       requestRender();
     },
 
@@ -230,6 +326,7 @@ export function createRenderStateResolver(
         onIntentChange();
       } else {
         deindexVisual(layer);
+        scheduleTransition(layer.identities, layer.transition);
         markDirty(layer.identities);
       }
       requestRender();
@@ -243,6 +340,7 @@ export function createRenderStateResolver(
         if (isIntentChannel(layer.channel)) removedIntent = true;
         else {
           deindexVisual(layer);
+          scheduleTransition(layer.identities, layer.transition);
           markDirty(layer.identities);
         }
       }
@@ -256,20 +354,42 @@ export function createRenderStateResolver(
     getLightingIntent: () => resolveIntent<LightingIntentValue>('lightingIntent'),
 
     flush() {
-      if (disposed || dirty.size === 0) return;
+      if (disposed || (dirty.size === 0 && animating.size === 0)) return;
       const updates: NodeStateUpdate[] = [];
-      for (const identity of dirty) {
-        const state = resolveNode(identity);
+      // Snapshot the identities to process; a starting transition re-marks its node
+      // (into `animating`), handled on later frames — the first frame is pushed here.
+      const ids = new Set<string>([...dirty, ...animating]);
+      for (const identity of ids) {
+        const layerChanged = dirty.has(identity);
+        const target = resolveNode(identity);
+
+        let pushState: EffectiveVisualState;
+        if (layerChanged) {
+          const spec = pendingTransition.get(identity);
+          pendingTransition.delete(identity);
+          if (spec && animation) {
+            pushState = startTransition(identity, target, spec);
+          } else {
+            cancelTransition(identity); // an immediate change overrides any transition
+            pushState = target;
+          }
+        } else {
+          // Tween tick only: push the in-flight value, or the target once it ended.
+          const active = activeTransitions.get(identity);
+          pushState = active ? active.current : target;
+        }
+
         const previous = lastPushed.get(identity);
-        if (previous && visualStateEquals(previous, state)) continue;
-        const isRest = state === REST_VISUAL_STATE || visualStateEquals(state, REST_VISUAL_STATE);
-        // Never touched and already at rest → nothing to reset (avoids a spurious apply).
-        if (!previous && isRest) continue;
-        updates.push({ identity, state });
+        if (previous && visualStateEquals(previous, pushState)) continue;
+        const isRest =
+          pushState === REST_VISUAL_STATE || visualStateEquals(pushState, REST_VISUAL_STATE);
+        if (!previous && isRest) continue; // never touched, already at rest
+        updates.push({ identity, state: pushState });
         if (isRest) lastPushed.delete(identity);
-        else lastPushed.set(identity, state);
+        else lastPushed.set(identity, pushState);
       }
       dirty.clear();
+      animating.clear();
       if (updates.length > 0) port.applyNodeStates(updates);
     },
 
@@ -280,9 +400,13 @@ export function createRenderStateResolver(
     dispose() {
       if (disposed) return;
       disposed = true;
+      for (const active of activeTransitions.values()) active.handle?.cancel();
+      activeTransitions.clear();
+      pendingTransition.clear();
       layers.clear();
       visualLayersByIdentity.clear();
       dirty.clear();
+      animating.clear();
       lastPushed.clear();
     },
   };

@@ -40,6 +40,8 @@ export interface OrbitControls extends ControlInput {
   setView(position: Vec3, target: Vec3): void;
   /** Subscribe to "a new goal was set" notifications (to wake a render loop). */
   onChange(handler: () => void): Unsubscribe;
+  /** Current camera position + orbit target (the eased "current" pose). */
+  getView(): { position: Vec3; target: Vec3 };
   /** Release listeners. Idempotent. */
   dispose(): void;
 }
@@ -197,6 +199,15 @@ export function createOrbitControls(
     onChange(handler) {
       handlers.add(handler);
       return () => handlers.delete(handler);
+    },
+    getView() {
+      const sinP = Math.sin(current.polar);
+      const position: Vec3 = [
+        current.tx + current.radius * sinP * Math.sin(current.azimuth),
+        current.ty + current.radius * Math.cos(current.polar),
+        current.tz + current.radius * sinP * Math.cos(current.azimuth),
+      ];
+      return { position, target: [current.tx, current.ty, current.tz] };
     },
     dispose() {
       if (disposed) return;

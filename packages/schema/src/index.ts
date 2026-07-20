@@ -10,6 +10,9 @@ export {
   DEFAULT_CAMERA,
   DEFAULT_CONTROLS,
   MODEL_DEFAULTS,
+  EASE_NAMES,
+  DEFAULT_FOCUS,
+  DEFAULT_FOCUS_TRANSITION,
 } from './defaults';
 export type { MigrationResult } from './migrate';
 export type {
@@ -28,6 +31,10 @@ export type {
   HotspotAnchor,
   HotspotAction,
   HotspotConfig,
+  EaseName,
+  TransitionSpec,
+  FocusOutlineConfig,
+  FocusConfig,
   ResolvedConfig,
   ConfigIssue,
   ValidationResult,
