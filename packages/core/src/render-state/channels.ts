@@ -98,6 +98,62 @@ export const REST_VISUAL_STATE: EffectiveVisualState = Object.freeze({
   visibility: 'visible' as const,
 });
 
+const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+
+const IDENTITY_TRANSFORM: TransformValue = {
+  translate: [0, 0, 0],
+  rotate: [0, 0, 0],
+  scale: [1, 1, 1],
+};
+
+function asScaleVec(s: number | Vec3 | undefined): [number, number, number] {
+  if (s === undefined) return [1, 1, 1];
+  return typeof s === 'number' ? [s, s, s] : [s[0], s[1], s[2]];
+}
+
+function lerpTransform(
+  from: TransformValue | null,
+  to: TransformValue | null,
+  t: number,
+): TransformValue | null {
+  if (from === null && to === null) return null;
+  const a = from ?? IDENTITY_TRANSFORM;
+  const b = to ?? IDENTITY_TRANSFORM;
+  const at = a.translate ?? [0, 0, 0];
+  const bt = b.translate ?? [0, 0, 0];
+  const ar = a.rotate ?? [0, 0, 0];
+  const br = b.rotate ?? [0, 0, 0];
+  const as = asScaleVec(a.scale);
+  const bs = asScaleVec(b.scale);
+  return {
+    translate: [lerp(at[0], bt[0], t), lerp(at[1], bt[1], t), lerp(at[2], bt[2], t)],
+    rotate: [lerp(ar[0], br[0], t), lerp(ar[1], br[1], t), lerp(ar[2], br[2], t)],
+    scale: [lerp(as[0], bs[0], t), lerp(as[1], bs[1], t), lerp(as[2], bs[2], t)],
+  };
+}
+
+/**
+ * Interpolate a visual state for a transition (chapter 19 §19.4 step 4). CONTINUOUS
+ * channels (opacity, transform) are lerped from→to; DISCRETE channels take the
+ * TARGET value throughout (colorOverride/outline appear at once). Visibility stays
+ * visible while either side is visible and only snaps to `to` at the end — so an
+ * isolate/hide only takes effect once the fade completes (no popping).
+ */
+export function interpolateVisualState(
+  from: EffectiveVisualState,
+  to: EffectiveVisualState,
+  t: number,
+): EffectiveVisualState {
+  if (t >= 1) return to;
+  return {
+    opacity: lerp(from.opacity, to.opacity, t),
+    transform: lerpTransform(from.transform, to.transform, t),
+    colorOverride: to.colorOverride,
+    outline: to.outline,
+    visibility: from.visibility === 'visible' || to.visibility === 'visible' ? 'visible' : 'hidden',
+  };
+}
+
 const VISUAL_CHANNELS: readonly VisualChannel[] = [
   'transform',
   'opacity',

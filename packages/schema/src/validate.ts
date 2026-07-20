@@ -8,8 +8,11 @@ import type {
   CameraConfig,
   ComponentConfig,
   ConfigIssue,
+  EaseName,
   EnvironmentConfig,
   EnvironmentSourceId,
+  FocusConfig,
+  FocusOutlineConfig,
   HotspotAction,
   HotspotAnchor,
   HotspotConfig,
@@ -19,13 +22,17 @@ import type {
   ModelConfig,
   NodeRef,
   ResolvedConfig,
+  TransitionSpec,
   ValidationResult,
 } from './types';
 import {
   DEFAULT_CAMERA,
   DEFAULT_ENVIRONMENT,
+  DEFAULT_FOCUS,
+  DEFAULT_FOCUS_TRANSITION,
   DEFAULT_LIGHTING,
   DEFAULT_META,
+  EASE_NAMES,
   MODEL_DEFAULTS,
   SUPPORTED_SCHEMA_MAJORS,
 } from './defaults';
@@ -39,6 +46,7 @@ const KNOWN_KEYS = new Set([
   'camera',
   'components',
   'hotspots',
+  'focus',
 ]);
 const LIGHTING_PRESETS: readonly LightingPresetId[] = ['studio', 'outdoor', 'night'];
 const ENV_SOURCES: readonly EnvironmentSourceId[] = ['none', 'neutral-room'];
@@ -82,6 +90,81 @@ class Ctx {
     }
     return v;
   }
+  /** Bounded number: out-of-range → clamp + warning (§5.6 rule 6). */
+  numClamped(v: unknown, path: string, fallback: number, min: number, max: number): number {
+    const n = this.num(v, path, fallback);
+    if (n < min || n > max) {
+      const clamped = Math.min(max, Math.max(min, n));
+      this.warn(path, `must be within [${min}, ${max}] — clamped to ${clamped}`);
+      return clamped;
+    }
+    return n;
+  }
+}
+
+function validateTransition(
+  ctx: Ctx,
+  raw: unknown,
+  path: string,
+  fallback: TransitionSpec,
+): TransitionSpec {
+  if (raw === undefined) return fallback;
+  if (!isObject(raw)) {
+    ctx.error(path, 'must be a transition object { duration, easing?, delay? }');
+    return fallback;
+  }
+  let easing = fallback.easing;
+  if (raw['easing'] !== undefined) {
+    if (EASE_NAMES.includes(raw['easing'] as EaseName)) easing = raw['easing'] as EaseName;
+    else ctx.error(`${path}.easing`, `must be one of ${EASE_NAMES.join(' | ')}`);
+  }
+  return {
+    duration: ctx.numClamped(raw['duration'], `${path}.duration`, fallback.duration, 0, 60000),
+    easing,
+    delay: ctx.numClamped(raw['delay'], `${path}.delay`, fallback.delay, 0, 60000),
+  };
+}
+
+function validateFocusOutline(ctx: Ctx, raw: unknown): FocusOutlineConfig {
+  const d = DEFAULT_FOCUS.outline;
+  if (raw === undefined) return d;
+  if (isBoolean(raw)) return { ...d, enabled: raw };
+  if (!isObject(raw)) {
+    ctx.error('focus.outline', 'must be a boolean or an object { color?, thickness? }');
+    return d;
+  }
+  return {
+    enabled: ctx.bool(raw['enabled'], 'focus.outline.enabled', true),
+    color: ctx.str(raw['color'], 'focus.outline.color', d.color),
+    thickness: ctx.numClamped(raw['thickness'], 'focus.outline.thickness', d.thickness, 0, 16),
+  };
+}
+
+function validateFocus(ctx: Ctx, raw: unknown): FocusConfig {
+  if (raw === undefined) return DEFAULT_FOCUS;
+  if (!isObject(raw)) {
+    ctx.error('focus', 'must be an object');
+    return DEFAULT_FOCUS;
+  }
+  return {
+    padding: ctx.numClamped(raw['padding'], 'focus.padding', DEFAULT_FOCUS.padding, 1, 10),
+    dimOthers: ctx.bool(raw['dimOthers'], 'focus.dimOthers', DEFAULT_FOCUS.dimOthers),
+    dimOpacity: ctx.numClamped(
+      raw['dimOpacity'],
+      'focus.dimOpacity',
+      DEFAULT_FOCUS.dimOpacity,
+      0,
+      1,
+    ),
+    outline: validateFocusOutline(ctx, raw['outline']),
+    isolate: ctx.bool(raw['isolate'], 'focus.isolate', DEFAULT_FOCUS.isolate),
+    transition: validateTransition(
+      ctx,
+      raw['transition'],
+      'focus.transition',
+      DEFAULT_FOCUS_TRANSITION,
+    ),
+  };
 }
 
 function validateMeta(ctx: Ctx, raw: unknown): MetaConfig {
@@ -498,6 +581,7 @@ export function validateConfig(raw: unknown): ValidationResult {
     camera: validateCamera(ctx, raw['camera']),
     components,
     hotspots,
+    focus: validateFocus(ctx, raw['focus']),
   };
 
   if (ctx.errors.length > 0) return { ok: false, errors: ctx.errors, warnings: ctx.warnings };

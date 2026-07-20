@@ -1,5 +1,6 @@
 export {
   composeVisualState,
+  interpolateVisualState,
   visualStateEquals,
   isVisualChannel,
   isIntentChannel,

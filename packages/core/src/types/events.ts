@@ -5,7 +5,7 @@
 // The bus is compile-time checked against this map.
 import type { BoundingBox } from '../ports/scene-port';
 import type { ModelLoadPhase } from '../model/model-loader-port';
-import type { HotspotAction } from '@explorer-engine/schema';
+import type { Address, HotspotAction } from '@explorer-engine/schema';
 
 export interface EngineDisposedEvent {
   /** Epoch milliseconds at which disposal occurred. */
@@ -51,6 +51,17 @@ export interface HotspotHoverEvent {
   readonly id: string | null;
 }
 
+/** A focus level was entered (P5-T4). */
+export interface FocusStartedEvent {
+  readonly target: Address;
+}
+
+/** A focus level was exited; `current` is the new top of the stack (or null). */
+export interface FocusEndedEvent {
+  readonly target: Address;
+  readonly current: Address | null;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -61,4 +72,6 @@ export interface EngineEventMap {
   'selection:hover': SelectionHoverEvent;
   'hotspot:activated': HotspotActivatedEvent;
   'hotspot:hover': HotspotHoverEvent;
+  'focus:started': FocusStartedEvent;
+  'focus:ended': FocusEndedEvent;
 }
