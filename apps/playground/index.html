@@ -131,6 +131,44 @@
           transition: none;
         }
       }
+      /* State toolbar (Sprint 4). */
+      .ee-toolbar {
+        position: fixed;
+        left: 50%;
+        bottom: 1rem;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        padding: 0.4rem 0.5rem;
+        border-radius: 0.6rem;
+        background: rgba(0, 0, 0, 0.55);
+      }
+      .ee-toolbar-group {
+        display: flex;
+        gap: 0.25rem;
+      }
+      .ee-toolbar-item {
+        padding: 0.35rem 0.7rem;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 0.35rem;
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font: inherit;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+      .ee-toolbar-item:hover,
+      .ee-toolbar-item:focus-visible {
+        border-color: #3ba7ff;
+      }
+      .ee-toolbar-item[data-active='true'] {
+        background: #3ba7ff;
+        border-color: #fff;
+      }
+      .ee-toolbar-reset {
+        opacity: 0.85;
+      }
     </style>
   </head>
   <body>

@@ -1,15 +1,16 @@
-// Explorer Engine — development playground (Sprint 3: focus + animation).
+// Explorer Engine — development playground (Sprint 4: states).
 //
 // The playground is a GENERIC composition root: it fetches a config.json through
 // the Config Loader (core), then builds the scene ENTIRELY from that resolved
 // config — lighting, environment, camera, controls, model, AND the interaction +
-// focus/animation stack (Render State Resolver, Animation Engine, Selection,
-// Hotspots, Focus Manager, camera intent controller). There is no object-specific
-// code: the same code drives any config (proof of L1/L2).
+// focus/animation + state stack (Render State Resolver, Animation Engine, Selection,
+// Hotspots, Focus Manager, camera intent controller, State Manager). There is no
+// object-specific code: the same code drives any config (proof of L1/L2).
 //
 //   ?config=minimal      minimal single-cube config (default)
 //   ?config=indexed      multi-node model, exercises the node index (P2-T4)
 //   ?config=interactive  components + hotspots + focus, exercises Sprint 2/3
+//   ?config=states       bases + modifiers (exploded / X-ray / cutaway), Sprint 4
 import {
   createOrbitControls,
   getLightingPreset,
@@ -24,6 +25,7 @@ import {
   createHotspotManager,
   createAnimationEngine,
   createFocusManager,
+  createStateManager,
   EventBus,
   type EngineEventMap,
   type ResolvedConfig,
@@ -45,12 +47,14 @@ import {
 import { createFetchTransport } from '@explorer-engine/resource-fetch';
 import { createDomInput } from '@explorer-engine/input-dom';
 import { createHotspotOverlay } from './hotspot-overlay';
+import { createStateToolbar } from './state-toolbar';
 
 const DEG2RAD = Math.PI / 180;
 
 const CONFIG_PATH = ((): string => {
   const which = new URLSearchParams(window.location.search).get('config');
   if (which === 'indexed') return 'indexed.json';
+  if (which === 'states') return 'states.json';
   if (which === 'interactive') return 'interactive.json';
   return 'minimal.json';
 })();
@@ -117,7 +121,8 @@ async function boot(app: HTMLDivElement): Promise<void> {
   // 3. Interaction + focus/animation stack. All visual state flows through the
   // resolver (L5); every animation goes through the headless Animation Engine.
   const components = createComponentModel(config);
-  const applicator = createRenderStateApplicator({ scene });
+  // The applicator is given the renderer so cutaway clipping can be enabled.
+  const applicator = createRenderStateApplicator({ scene, renderer });
   let renderCount = 0;
   const wake = () => loop.requestRender();
   const engine = createAnimationEngine({ requestRender: wake, reducedMotion });
@@ -169,6 +174,43 @@ async function boot(app: HTMLDivElement): Promise<void> {
         })
       : null;
 
+  // State Manager (headless statechart) → publishes state/modifier layers + intents.
+  const stateManager = createStateManager({
+    resolver,
+    states: config.states,
+    initialState: config.initialState,
+    events,
+  });
+  const bases = config.states
+    .filter((s) => s.region === 'base')
+    .map((s) => ({ id: s.id, label: s.label }));
+  const mods = config.states
+    .filter((s) => s.region !== 'base')
+    .map((s) => ({ id: s.id, label: s.label }));
+  const toolbar =
+    config.states.length > 0
+      ? createStateToolbar({
+          container: document.body,
+          bases,
+          modifiers: mods,
+          onBase: (id) => {
+            stateManager.goToBase(id);
+            wake();
+          },
+          onModifier: (id) => {
+            stateManager.toggleModifier(id);
+            wake();
+          },
+          onReset: () => {
+            focus.clear();
+            selection.clearSelection();
+            stateManager.reset();
+            wake();
+          },
+        })
+      : null;
+  toolbar?.update(stateManager.getBase(), stateManager.getModifiers());
+
   // React to interaction events (typed bus). A hotspot `focus` action now drives
   // the Focus Manager (camera transition + dim/outline); `emit` is just reported.
   events.on('selection:changed', (e) => (caption.textContent = `Selected: ${e.component}`));
@@ -178,7 +220,14 @@ async function boot(app: HTMLDivElement): Promise<void> {
   });
   events.on('hotspot:activated', (e) => {
     if (e.action.type === 'focus') focus.focus(e.action.target);
+    else if (e.action.type === 'goToState') stateManager.goToState(e.action.state);
     else caption.textContent = `Hotspot ${e.id} → ${e.action.type}`;
+    wake();
+  });
+  // Keep the toolbar in sync with the macroscopic state.
+  events.on('state:changed', (e) => {
+    toolbar?.update(e.base, e.modifiers);
+    caption.textContent = `State: ${e.base ?? 'rest'}${e.modifiers.length ? ' + ' + e.modifiers.join(', ') : ''}`;
     wake();
   });
 
@@ -301,6 +350,8 @@ async function boot(app: HTMLDivElement): Promise<void> {
     controls.dispose();
     modelLoader.dispose();
     overlay?.dispose();
+    toolbar?.dispose();
+    stateManager.dispose();
     focus.dispose();
     cam.controller?.dispose();
     engine.dispose();
@@ -359,6 +410,17 @@ async function boot(app: HTMLDivElement): Promise<void> {
       cameraPose: () => cam.controller?.getView(),
       cameraTransitioning: () => cam.controller?.isTransitioning() ?? false,
       engineActive: () => engine.hasActive,
+      // Sprint 4 state hooks.
+      goToState: (id: string) => stateManager.goToState(id),
+      goToBase: (id: string) => stateManager.goToBase(id),
+      toggleModifier: (id: string, on?: boolean) => stateManager.toggleModifier(id, on),
+      resetState: () => stateManager.reset(),
+      getBase: () => stateManager.getBase(),
+      getModifiers: () => stateManager.getModifiers(),
+      serializeState: () => stateManager.serialize(),
+      applyState: (snap: { base: string | null; modifiers: readonly string[] }) =>
+        stateManager.apply(snap),
+      toolbarButtons: () => document.querySelectorAll('.ee-toolbar-item').length,
       teardown,
     };
   }
