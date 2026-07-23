@@ -15,6 +15,7 @@ export type {
   ColorOverrideValue,
   OutlineValue,
   VisibilityValue,
+  ClipPlane,
   CameraIntentValue,
   LightingIntentValue,
   EffectiveVisualState,

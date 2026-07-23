@@ -8,15 +8,20 @@
 //   colorOverride  → priority (last-by-priority)
 //   outline        → priority
 //   visibility     → "hidden" wins (isolation)
+//   clip           → additive union of clipping planes (cutaway, chapter 09 §9.2.1)
 //   cameraIntent   → exclusive, resolved by priority (global, not per-node)
 //   lightingIntent → exclusive, resolved by priority (global, not per-node)
+//
+// `clip` is added additively for Sprint 4 (the v1 list is otherwise closed); it
+// carries data-only planes that the renderer adapter converts to clipping planes.
 //
 // Headless & data-only: no DOM/Three.js. Every value is a plain, serialisable
 // object; the renderer adapter turns the effective state into concrete pixels.
 import type { Vec3 } from '../ports/camera-port';
 
 /** Per-node visual channels composed into an effective visual state. */
-export type VisualChannel = 'transform' | 'opacity' | 'colorOverride' | 'outline' | 'visibility';
+export type VisualChannel =
+  'transform' | 'opacity' | 'colorOverride' | 'outline' | 'visibility' | 'clip';
 
 /** Global, exclusive intent channels (one winner, resolved by priority). */
 export type IntentChannel = 'cameraIntent' | 'lightingIntent';
@@ -51,6 +56,16 @@ export interface OutlineValue {
 
 export type VisibilityValue = 'visible' | 'hidden';
 
+/**
+ * A half-space clipping plane for cutaway (chapter 09 §9.2.1). Everything on the
+ * NEGATIVE side of `normal·x - offset` is clipped away. Data-only — the renderer
+ * adapter turns it into a real clipping plane.
+ */
+export interface ClipPlane {
+  readonly normal: Vec3;
+  readonly offset: number;
+}
+
 /** A camera pose intent (chapter 19 §19.5). Exclusive by priority. */
 export interface CameraIntentValue {
   readonly position: Vec3;
@@ -71,6 +86,7 @@ export interface ChannelValueMap {
   colorOverride: ColorOverrideValue;
   outline: OutlineValue;
   visibility: VisibilityValue;
+  clip: readonly ClipPlane[];
   cameraIntent: CameraIntentValue;
   lightingIntent: LightingIntentValue;
 }
@@ -87,7 +103,11 @@ export interface EffectiveVisualState {
   readonly colorOverride: ColorOverrideValue | null;
   readonly outline: OutlineValue | null;
   readonly visibility: VisibilityValue;
+  /** Active clipping planes (cutaway). Empty = no clipping. */
+  readonly clip: readonly ClipPlane[];
 }
+
+const NO_CLIP: readonly ClipPlane[] = Object.freeze([]);
 
 /** The rest-pose default effective state (no contributions). Frozen & shared. */
 export const REST_VISUAL_STATE: EffectiveVisualState = Object.freeze({
@@ -96,6 +116,7 @@ export const REST_VISUAL_STATE: EffectiveVisualState = Object.freeze({
   colorOverride: null,
   outline: null,
   visibility: 'visible' as const,
+  clip: NO_CLIP,
 });
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
@@ -151,6 +172,8 @@ export function interpolateVisualState(
     colorOverride: to.colorOverride,
     outline: to.outline,
     visibility: from.visibility === 'visible' || to.visibility === 'visible' ? 'visible' : 'hidden',
+    // Clip planes are structural (variable count) → snap to the target (discrete).
+    clip: to.clip,
   };
 }
 
@@ -160,6 +183,7 @@ const VISUAL_CHANNELS: readonly VisualChannel[] = [
   'colorOverride',
   'outline',
   'visibility',
+  'clip',
 ];
 
 const INTENT_CHANNELS: readonly IntentChannel[] = ['cameraIntent', 'lightingIntent'];
@@ -236,6 +260,7 @@ export function composeVisualState(contribs: readonly VisualContribution[]): Eff
   let visibility: VisibilityValue = 'visible';
   let colorWinner: VisualContribution | null = null;
   let outlineWinner: VisualContribution | null = null;
+  let clip: ClipPlane[] | null = null;
 
   for (const c of contribs) {
     switch (c.channel) {
@@ -251,6 +276,11 @@ export function composeVisualState(contribs: readonly VisualContribution[]): Eff
       case 'outline':
         outlineWinner = outlineWinner ? winner(outlineWinner, c) : c;
         break;
+      case 'clip': {
+        const planes = c.value as readonly ClipPlane[];
+        if (planes.length > 0) (clip ??= []).push(...planes); // additive union
+        break;
+      }
       case 'transform':
         break; // handled by composeTransform
     }
@@ -262,6 +292,7 @@ export function composeVisualState(contribs: readonly VisualContribution[]): Eff
     colorOverride: colorWinner ? (colorWinner.value as ColorOverrideValue) : null,
     outline: outlineWinner ? (outlineWinner.value as OutlineValue) : null,
     visibility,
+    clip: clip ?? NO_CLIP,
   };
 }
 
@@ -272,8 +303,20 @@ export function visualStateEquals(a: EffectiveVisualState, b: EffectiveVisualSta
     a.visibility === b.visibility &&
     transformEquals(a.transform, b.transform) &&
     colorEquals(a.colorOverride, b.colorOverride) &&
-    outlineEquals(a.outline, b.outline)
+    outlineEquals(a.outline, b.outline) &&
+    clipEquals(a.clip, b.clip)
   );
+}
+
+function clipEquals(a: readonly ClipPlane[], b: readonly ClipPlane[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const pa = a[i] as ClipPlane;
+    const pb = b[i] as ClipPlane;
+    if (pa.offset !== pb.offset || !vecEquals(pa.normal, pb.normal)) return false;
+  }
+  return true;
 }
 
 function vecEquals(a: Vec3 | undefined, b: Vec3 | undefined): boolean {
