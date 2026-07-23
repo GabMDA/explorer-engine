@@ -129,6 +129,34 @@ describe('validatePackage', () => {
     expect(report.errors.some((e) => e.path === 'hotspots[0].anchor.id')).toBe(false);
   });
 
+  it('detects a state layer node target missing from the model', () => {
+    const cfg = JSON.stringify({
+      schemaVersion: '1.0',
+      model: { src: 'models/m.glb' },
+      components: [{ id: 'crown', nodes: [{ explorerId: 'crown' }] }],
+      states: [
+        { id: 'closed', region: 'base' },
+        {
+          id: 'open',
+          region: 'base',
+          layers: [
+            {
+              target: { kind: 'node', id: 'crown' },
+              channel: 'transform',
+              value: { translate: [0, 1, 0] },
+            },
+            { target: { kind: 'node', id: 'ghost' }, channel: 'opacity', value: 0.3 },
+          ],
+        },
+      ],
+      initialState: 'closed',
+    });
+    const report = validatePackage(memFs({ 'config.json': cfg, 'models/m.glb': glbWithNodes }));
+    expect(report.ok).toBe(false);
+    expect(report.errors.some((e) => e.path === 'states[1].layers[1].target.id')).toBe(true);
+    expect(report.errors.some((e) => e.path === 'states[1].layers[0].target.id')).toBe(false);
+  });
+
   it('warns on a name-referenced node that exists, errors on one that does not', () => {
     const ok = JSON.stringify({
       schemaVersion: '1.0',

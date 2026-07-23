@@ -145,5 +145,18 @@ export function validatePackage(fs: PackageFs, configPath = 'config.json'): Pack
     }
   });
 
+  // State layer node targets must also resolve to a real GLB node (component/group
+  // targets, allowedFrom and initialState were already checked by the schema validator).
+  config.states.forEach((state, i) => {
+    state.layers.forEach((layer, j) => {
+      if (layer.target.kind === 'node' && !knownIdentity(layer.target.id)) {
+        errors.push({
+          path: `states[${i}].layers[${j}].target.id`,
+          message: `node "${layer.target.id}" not found in model`,
+        });
+      }
+    });
+  });
+
   return { ok: errors.length === 0, errors, warnings };
 }
