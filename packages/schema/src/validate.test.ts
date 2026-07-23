@@ -216,6 +216,111 @@ describe('validateConfig', () => {
     expect(r.errors.some((e) => e.path === 'hotspots[1].id')).toBe(true);
     expect(r.errors.some((e) => e.path === 'hotspots[1].action.target')).toBe(true);
   });
+
+  const withStates = (states: unknown, initialState?: unknown) => ({
+    schemaVersion: '1.0',
+    model: { src: 'm.glb' },
+    components: [
+      { id: 'gpu', nodes: [{ explorerId: 'gpu' }], group: 'internals' },
+      { id: 'panel', nodes: [{ explorerId: 'panel' }], group: 'shell' },
+    ],
+    states,
+    ...(initialState !== undefined ? { initialState } : {}),
+  });
+
+  it('accepts declarative states (base + modifier) with layers and camera intent', () => {
+    const r = validateConfig(
+      withStates(
+        [
+          { id: 'closed', label: 'Closed', region: 'base' },
+          {
+            id: 'exploded',
+            label: 'Exploded',
+            region: 'base',
+            allowedFrom: ['closed'],
+            layers: [
+              {
+                target: { kind: 'component', id: 'gpu' },
+                channel: 'transform',
+                value: { translate: [0, -0.3, 0] },
+              },
+            ],
+            cameraIntent: { position: [2, 1, 3], target: [0, 0, 0] },
+            transition: { duration: 800, easing: 'easeInOut' },
+          },
+          {
+            id: 'xray',
+            label: 'X-ray',
+            region: 'modifier-opacity',
+            layers: [{ target: { kind: 'group', id: 'shell' }, channel: 'opacity', value: 0.2 }],
+          },
+          {
+            id: 'cutaway',
+            label: 'Cutaway',
+            region: 'modifier-clip',
+            layers: [
+              {
+                target: { kind: 'group', id: 'internals' },
+                channel: 'clip',
+                value: [{ normal: [1, 0, 0], offset: 0 }],
+              },
+            ],
+          },
+        ],
+        'closed',
+      ),
+    );
+    expect(r.ok).toBe(true);
+    expect(r.value?.states).toHaveLength(4);
+    expect(r.value?.initialState).toBe('closed');
+    expect(r.value?.states[1]?.cameraIntent).toEqual({ position: [2, 1, 3], target: [0, 0, 0] });
+    expect(r.value?.states[3]?.layers[0]?.channel).toBe('clip');
+  });
+
+  it('rejects duplicate state ids, unknown layer targets, bad allowedFrom, invalid initialState', () => {
+    const r = validateConfig(
+      withStates(
+        [
+          { id: 'a', region: 'base' },
+          { id: 'a', region: 'base' }, // duplicate
+          {
+            id: 'b',
+            region: 'base',
+            allowedFrom: ['ghost'], // unknown base
+            layers: [{ target: { kind: 'component', id: 'nope' }, channel: 'opacity', value: 0.5 }],
+          },
+        ],
+        'missing', // unknown base
+      ),
+    );
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'states[1].id')).toBe(true);
+    expect(r.errors.some((e) => e.path === 'states[2].allowedFrom[0]')).toBe(true);
+    expect(r.errors.some((e) => e.path === 'states[2].layers[0].target')).toBe(true);
+    expect(r.errors.some((e) => e.path === 'initialState')).toBe(true);
+  });
+
+  it('rejects a relative transform and an unknown state layer channel', () => {
+    const r = validateConfig(
+      withStates([
+        {
+          id: 'open',
+          region: 'base',
+          layers: [
+            {
+              target: { kind: 'component', id: 'gpu' },
+              channel: 'transform',
+              value: { translate: [1, 0, 0], relative: true },
+            },
+            { target: { kind: 'component', id: 'gpu' }, channel: 'bogus', value: 1 },
+          ],
+        },
+      ]),
+    );
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'states[0].layers[0].value.relative')).toBe(true);
+    expect(r.errors.some((e) => e.path === 'states[0].layers[1].channel')).toBe(true);
+  });
 });
 
 describe('migrateConfig', () => {

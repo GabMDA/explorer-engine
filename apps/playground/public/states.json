@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0",
+  "meta": { "title": "States Demo", "defaultLocale": "en" },
+  "model": { "src": "models/indexed.glb" },
+  "camera": { "controls": { "minDistance": 1, "maxDistance": 20 } },
+  "components": [
+    { "id": "crown", "label": "Crown", "nodes": [{ "explorerId": "crown" }], "group": "shell" },
+    { "id": "gear-left", "label": "Gear (left)", "nodes": [{ "explorerId": "gear" }], "pickTarget": "gears" },
+    { "id": "gear-top", "label": "Gear (top)", "nodes": [{ "explorerId": "gear2" }], "pickTarget": "gears" },
+    {
+      "id": "gears",
+      "label": "Gears",
+      "nodes": [{ "explorerId": "gear" }, { "explorerId": "gear2" }],
+      "group": "internals"
+    }
+  ],
+  "focus": {
+    "padding": 1.6,
+    "dimOpacity": 0.12,
+    "outline": { "color": "#ffd166", "thickness": 1.5 },
+    "transition": { "duration": 600, "easing": "easeInOut" }
+  },
+  "states": [
+    { "id": "closed", "label": "Closed", "region": "base" },
+    {
+      "id": "exploded",
+      "label": "Exploded",
+      "region": "base",
+      "allowedFrom": ["closed"],
+      "layers": [
+        { "target": { "kind": "component", "id": "crown" }, "channel": "transform", "value": { "translate": [-0.7, 0, 0] } },
+        { "target": { "kind": "component", "id": "gear-left" }, "channel": "transform", "value": { "translate": [0.7, 0, 0] } },
+        { "target": { "kind": "component", "id": "gear-top" }, "channel": "transform", "value": { "translate": [0, 0.7, 0] } }
+      ],
+      "cameraIntent": { "position": [4, 2.5, 5.5], "target": [0, 0.2, 0] },
+      "transition": { "duration": 800, "easing": "easeInOut" }
+    },
+    {
+      "id": "xray",
+      "label": "X-ray",
+      "region": "modifier-opacity",
+      "layers": [
+        { "target": { "kind": "group", "id": "shell" }, "channel": "opacity", "value": 0.2 }
+      ],
+      "transition": { "duration": 500, "easing": "easeInOut" }
+    },
+    {
+      "id": "cutaway",
+      "label": "Cutaway",
+      "region": "modifier-clip",
+      "layers": [
+        { "target": { "kind": "group", "id": "internals" }, "channel": "clip", "value": [{ "normal": [0, 1, 0], "offset": 0 }] }
+      ]
+    }
+  ],
+  "initialState": "closed",
+  "hotspots": [
+    {
+      "id": "hs-explode",
+      "label": "Explode",
+      "anchor": { "kind": "component", "id": "gears" },
+      "action": { "type": "goToState", "state": "exploded" }
+    },
+    {
+      "id": "hs-crown",
+      "label": "Focus crown",
+      "anchor": { "kind": "component", "id": "crown" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "crown" } }
+    }
+  ]
+}

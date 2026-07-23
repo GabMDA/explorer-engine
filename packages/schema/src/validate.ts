@@ -6,6 +6,7 @@ import type {
   Address,
   BackgroundConfig,
   CameraConfig,
+  ClipPlaneConfig,
   ComponentConfig,
   ConfigIssue,
   EaseName,
@@ -22,6 +23,10 @@ import type {
   ModelConfig,
   NodeRef,
   ResolvedConfig,
+  StateCameraIntentConfig,
+  StateConfig,
+  StateLayerConfig,
+  TransformValueConfig,
   TransitionSpec,
   ValidationResult,
 } from './types';
@@ -47,6 +52,8 @@ const KNOWN_KEYS = new Set([
   'components',
   'hotspots',
   'focus',
+  'states',
+  'initialState',
 ]);
 const LIGHTING_PRESETS: readonly LightingPresetId[] = ['studio', 'outdoor', 'night'];
 const ENV_SOURCES: readonly EnvironmentSourceId[] = ['none', 'neutral-room'];
@@ -499,6 +506,211 @@ function validateHotspots(ctx: Ctx, raw: unknown): HotspotConfig[] {
   return out;
 }
 
+const STATE_CHANNELS = new Set(['transform', 'opacity', 'colorOverride', 'visibility', 'clip']);
+
+function validateTransformValue(ctx: Ctx, raw: unknown, path: string): TransformValueConfig | null {
+  if (!isObject(raw)) {
+    ctx.error(path, 'must be an object { translate?, rotate?, scale? }');
+    return null;
+  }
+  if (raw['relative'] !== undefined) {
+    // Transforms are ABSOLUTE offsets from the rest pose (chapter 19 §19.3.3, §5.6 rule 7).
+    ctx.error(
+      `${path}.relative`,
+      'is forbidden — transforms are absolute offsets from the rest pose',
+    );
+    return null;
+  }
+  const out: {
+    translate?: readonly [number, number, number];
+    rotate?: readonly [number, number, number];
+    scale?: number | readonly [number, number, number];
+  } = {};
+  if (raw['translate'] !== undefined) {
+    const t = vec3(ctx, raw['translate'], `${path}.translate`);
+    if (t) out.translate = t;
+  }
+  if (raw['rotate'] !== undefined) {
+    const r = vec3(ctx, raw['rotate'], `${path}.rotate`);
+    if (r) out.rotate = r;
+  }
+  if (raw['scale'] !== undefined) {
+    if (isNumber(raw['scale'])) out.scale = raw['scale'];
+    else {
+      const s = vec3(ctx, raw['scale'], `${path}.scale`);
+      if (s) out.scale = s;
+    }
+  }
+  return out;
+}
+
+function validateClipPlanes(ctx: Ctx, raw: unknown, path: string): readonly ClipPlaneConfig[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    ctx.error(path, 'must be a non-empty array of clip planes { normal, offset }');
+    return [];
+  }
+  const out: ClipPlaneConfig[] = [];
+  raw.forEach((item, i) => {
+    if (!isObject(item)) {
+      ctx.error(`${path}[${i}]`, 'must be an object { normal, offset }');
+      return;
+    }
+    const normal = vec3(ctx, item['normal'], `${path}[${i}].normal`);
+    if (normal === null) return;
+    if (normal[0] === 0 && normal[1] === 0 && normal[2] === 0) {
+      ctx.error(`${path}[${i}].normal`, 'must be a non-zero vector');
+      return;
+    }
+    out.push({ normal, offset: ctx.num(item['offset'], `${path}[${i}].offset`, 0) });
+  });
+  return out;
+}
+
+function validateStateLayer(ctx: Ctx, raw: unknown, path: string): StateLayerConfig | null {
+  if (!isObject(raw)) {
+    ctx.error(path, 'must be an object { target, channel, value }');
+    return null;
+  }
+  const target = validateAddress(ctx, raw['target'], `${path}.target`);
+  const channel = raw['channel'];
+  if (typeof channel !== 'string' || !STATE_CHANNELS.has(channel)) {
+    ctx.error(`${path}.channel`, `must be one of ${[...STATE_CHANNELS].join(' | ')}`);
+    return null;
+  }
+  if (target === null) return null;
+  switch (channel) {
+    case 'transform': {
+      const value = validateTransformValue(ctx, raw['value'], `${path}.value`);
+      return value ? { target, channel, value } : null;
+    }
+    case 'opacity':
+      return { target, channel, value: ctx.numClamped(raw['value'], `${path}.value`, 1, 0, 1) };
+    case 'visibility': {
+      if (raw['value'] !== 'visible' && raw['value'] !== 'hidden') {
+        ctx.error(`${path}.value`, "must be 'visible' | 'hidden'");
+        return null;
+      }
+      return { target, channel, value: raw['value'] };
+    }
+    case 'colorOverride': {
+      const v = raw['value'];
+      if (!isObject(v) || !isString(v['color'])) {
+        ctx.error(`${path}.value`, 'must be { color: string, intensity: number }');
+        return null;
+      }
+      return {
+        target,
+        channel,
+        value: {
+          color: v['color'],
+          intensity: ctx.numClamped(v['intensity'], `${path}.value.intensity`, 1, 0, 1),
+        },
+      };
+    }
+    case 'clip': {
+      const planes = validateClipPlanes(ctx, raw['value'], `${path}.value`);
+      return planes.length > 0 ? { target, channel, value: planes } : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function validateStateCameraIntent(
+  ctx: Ctx,
+  raw: unknown,
+  path: string,
+): StateCameraIntentConfig | null {
+  if (raw === undefined || raw === null) return null;
+  if (!isObject(raw)) {
+    ctx.error(path, 'must be an object { position: Vec3, target: Vec3 }');
+    return null;
+  }
+  const position = vec3(ctx, raw['position'], `${path}.position`);
+  const target = vec3(ctx, raw['target'], `${path}.target`);
+  if (position === null || target === null) return null;
+  return { position, target };
+}
+
+function validateStates(ctx: Ctx, raw: unknown): StateConfig[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    ctx.error('states', 'must be an array');
+    return [];
+  }
+  const out: StateConfig[] = [];
+  const seen = new Set<string>();
+  raw.forEach((item, i) => {
+    const base = `states[${i}]`;
+    if (!isObject(item)) {
+      ctx.error(base, 'must be an object');
+      return;
+    }
+    if (!isString(item['id']) || item['id'].length === 0) {
+      ctx.error(`${base}.id`, 'is required and must be a non-empty string');
+      return;
+    }
+    const id = item['id'];
+    if (seen.has(id)) ctx.error(`${base}.id`, `duplicate state id "${id}"`);
+    seen.add(id);
+
+    const region =
+      item['region'] === undefined || item['region'] === null
+        ? 'base'
+        : ctx.str(item['region'], `${base}.region`, 'base');
+
+    let allowedFrom: readonly string[] | null = null;
+    if (item['allowedFrom'] !== undefined && item['allowedFrom'] !== null) {
+      if (!Array.isArray(item['allowedFrom']) || !item['allowedFrom'].every(isString)) {
+        ctx.error(`${base}.allowedFrom`, 'must be an array of base state id strings');
+      } else {
+        allowedFrom = item['allowedFrom'];
+      }
+    }
+
+    let excludes: readonly string[] = [];
+    if (item['excludes'] !== undefined) {
+      if (!Array.isArray(item['excludes']) || !item['excludes'].every(isString)) {
+        ctx.error(`${base}.excludes`, 'must be an array of state/region id strings');
+      } else {
+        excludes = item['excludes'];
+      }
+    }
+
+    const layers: StateLayerConfig[] = [];
+    if (item['layers'] !== undefined) {
+      if (!Array.isArray(item['layers'])) {
+        ctx.error(`${base}.layers`, 'must be an array of layers');
+      } else {
+        item['layers'].forEach((l, j) => {
+          const layer = validateStateLayer(ctx, l, `${base}.layers[${j}]`);
+          if (layer) layers.push(layer);
+        });
+      }
+    }
+
+    out.push({
+      id,
+      label: ctx.str(item['label'], `${base}.label`, id),
+      region,
+      allowedFrom,
+      excludes,
+      layers,
+      cameraIntent: validateStateCameraIntent(ctx, item['cameraIntent'], `${base}.cameraIntent`),
+      transition:
+        item['transition'] === undefined || item['transition'] === null
+          ? null
+          : validateTransition(
+              ctx,
+              item['transition'],
+              `${base}.transition`,
+              DEFAULT_FOCUS_TRANSITION,
+            ),
+    });
+  });
+  return out;
+}
+
 /**
  * Config-level reference integrity (§5.6 rule 3): component `pickTarget`, hotspot
  * component/group anchors and focus targets must point at declared entities.
@@ -508,6 +720,8 @@ function validateReferences(
   ctx: Ctx,
   components: readonly ComponentConfig[],
   hotspots: readonly HotspotConfig[],
+  states: readonly StateConfig[],
+  initialState: string | null,
 ): void {
   const componentIds = new Set(components.map((c) => c.id));
   const groupIds = new Set(
@@ -538,6 +752,35 @@ function validateReferences(
     }
     if (h.action.type === 'focus') checkAddress(h.action.target, `${base}.action.target`);
   });
+
+  // States: layer targets must resolve; allowedFrom/initialState must name a base.
+  const stateIds = new Set(states.map((s) => s.id));
+  const baseIds = new Set(states.filter((s) => s.region === 'base').map((s) => s.id));
+  states.forEach((s, i) => {
+    const base = `states[${i}]`;
+    s.layers.forEach((layer, j) => checkAddress(layer.target, `${base}.layers[${j}].target`));
+    if (s.region === 'base') {
+      s.allowedFrom?.forEach((from, j) => {
+        if (!baseIds.has(from))
+          ctx.error(`${base}.allowedFrom[${j}]`, `unknown base state "${from}"`);
+      });
+    }
+    s.excludes.forEach((ex, j) => {
+      // May reference a state id or a modifier region id; warn if neither.
+      if (!stateIds.has(ex) && !states.some((st) => st.region === ex)) {
+        ctx.warn(`${base}.excludes[${j}]`, `"${ex}" matches no state id or region`);
+      }
+    });
+  });
+  // Hotspot goToState references must name an existing state.
+  hotspots.forEach((h, i) => {
+    if (h.action.type === 'goToState' && !stateIds.has(h.action.state)) {
+      ctx.error(`hotspots[${i}].action.state`, `unknown state id "${h.action.state}"`);
+    }
+  });
+  if (initialState !== null && !baseIds.has(initialState)) {
+    ctx.error('initialState', `must be an existing base state id (got "${initialState}")`);
+  }
 }
 
 /** Validate `raw` against the schema, applying defaults. Does not migrate (see migrateConfig). */
@@ -570,7 +813,12 @@ export function validateConfig(raw: unknown): ValidationResult {
 
   const components = validateComponents(ctx, raw['components']);
   const hotspots = validateHotspots(ctx, raw['hotspots']);
-  validateReferences(ctx, components, hotspots);
+  const states = validateStates(ctx, raw['states']);
+  const initialState =
+    raw['initialState'] === undefined || raw['initialState'] === null
+      ? null
+      : ctx.str(raw['initialState'], 'initialState', '');
+  validateReferences(ctx, components, hotspots, states, initialState);
 
   const resolved: ResolvedConfig = {
     schemaVersion: isString(version) ? version : '',
@@ -582,6 +830,8 @@ export function validateConfig(raw: unknown): ValidationResult {
     components,
     hotspots,
     focus: validateFocus(ctx, raw['focus']),
+    states,
+    initialState,
   };
 
   if (ctx.errors.length > 0) return { ok: false, errors: ctx.errors, warnings: ctx.warnings };

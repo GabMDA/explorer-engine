@@ -69,6 +69,18 @@ describe('composeVisualState', () => {
     expect(s.outline).toEqual({ color: '#3ba7ff', thickness: 1 });
     expect(s.visibility).toBe('visible');
   });
+
+  it('unions clip planes additively (cutaway) and defaults to none', () => {
+    expect(composeVisualState([]).clip).toEqual([]);
+    const s = composeVisualState([
+      c('clip', [{ normal: [1, 0, 0], offset: 0 }]),
+      c('clip', [{ normal: [0, 1, 0], offset: 0.2 }]),
+    ]);
+    expect(s.clip).toEqual([
+      { normal: [1, 0, 0], offset: 0 },
+      { normal: [0, 1, 0], offset: 0.2 },
+    ]);
+  });
 });
 
 describe('visualStateEquals', () => {

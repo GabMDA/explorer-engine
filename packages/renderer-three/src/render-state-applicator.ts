@@ -9,8 +9,14 @@
 // This is the ONLY place materials/transforms are mutated (L5). Three.js is confined
 // here (L9).
 import * as THREE from 'three';
-import type { NodeStateUpdate, RenderStatePort, EffectiveVisualState } from '@explorer-engine/core';
+import type {
+  NodeStateUpdate,
+  RenderStatePort,
+  EffectiveVisualState,
+  ClipPlane,
+} from '@explorer-engine/core';
 import type { SceneManager } from './scene-manager';
+import type { ThreeRendererHandle } from './internal/handles';
 
 interface MaterialRest {
   readonly material: THREE.Material;
@@ -19,6 +25,8 @@ interface MaterialRest {
   readonly hasEmissive: boolean;
   readonly emissive: number;
   readonly emissiveIntensity: number;
+  /** Rest clipping planes (usually null) — restored when cutaway is removed. */
+  readonly clippingPlanes: THREE.Plane[] | null;
 }
 
 interface RestPose {
@@ -32,6 +40,12 @@ interface RestPose {
 export interface RenderStateApplicatorOptions {
   /** Scene manager whose current node index resolves identity → Object3D. */
   readonly scene: SceneManager;
+  /**
+   * Renderer whose local clipping is enabled the first time a cutaway clip is
+   * applied. Omit ⇒ clip planes are still set on materials but stay inert
+   * (explicit fallback for renderers without clipping — chapter 09 §9.2.1).
+   */
+  readonly renderer?: ThreeRendererHandle;
 }
 
 // Reused scratch objects — applyNodeStates runs on change (not per frame), but we
@@ -61,6 +75,7 @@ function captureRest(object: THREE.Object3D): RestPose {
       hasEmissive,
       emissive: hasEmissive ? emissive.getHex() : 0,
       emissiveIntensity: (material as Partial<THREE.MeshStandardMaterial>).emissiveIntensity ?? 1,
+      clippingPlanes: material.clippingPlanes ?? null,
     };
   });
   return {
@@ -70,6 +85,18 @@ function captureRest(object: THREE.Object3D): RestPose {
     visible: object.visible,
     materials,
   };
+}
+
+/**
+ * Convert data-only clip planes to Three.js planes. A plane keeps the half-space
+ * where `normal·x ≥ offset`; Three clips where `normal·x + constant < 0`, so the
+ * constant is `-offset` (normals are normalised).
+ */
+function toThreePlanes(planes: readonly ClipPlane[]): THREE.Plane[] {
+  return planes.map((p) => {
+    const n = new THREE.Vector3(p.normal[0], p.normal[1], p.normal[2]).normalize();
+    return new THREE.Plane(n, -p.offset);
+  });
 }
 
 /** Resolve the emissive tint (colorOverride wins; outline is a fallback highlight). */
@@ -134,6 +161,9 @@ function applyToObject(object: THREE.Object3D, rest: RestPose, state: EffectiveV
         std.emissiveIntensity = rec.emissiveIntensity;
       }
     }
+    // Cutaway: set clipping planes from the effective clip, or restore the rest.
+    material.clippingPlanes =
+      state.clip.length > 0 ? toThreePlanes(state.clip) : rec.clippingPlanes;
   }
 }
 
@@ -144,14 +174,20 @@ export interface RenderStateApplicator extends RenderStatePort {
 export function createRenderStateApplicator(
   options: RenderStateApplicatorOptions,
 ): RenderStateApplicator {
-  const { scene } = options;
+  const { scene, renderer } = options;
   const restPoses = new WeakMap<THREE.Object3D, RestPose>();
+  let localClippingEnabled = false;
 
   return {
     applyNodeStates(updates: readonly NodeStateUpdate[]): void {
       const index = scene.getNodeIndex();
       if (!index) return;
       for (const { identity, state } of updates) {
+        // Enable local clipping once, lazily, the first time a cutaway appears.
+        if (state.clip.length > 0 && !localClippingEnabled && renderer) {
+          renderer.getThreeRenderer().localClippingEnabled = true;
+          localClippingEnabled = true;
+        }
         for (const object of index.resolve(identity)) {
           let rest = restPoses.get(object);
           if (!rest) {

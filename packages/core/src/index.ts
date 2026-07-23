@@ -110,6 +110,11 @@ export type {
   TransitionSpec,
   FocusOutlineConfig,
   FocusConfig,
+  TransformValueConfig,
+  ClipPlaneConfig,
+  StateLayerConfig,
+  StateCameraIntentConfig,
+  StateConfig,
   ConfigIssue,
   ValidationResult,
 } from '@explorer-engine/schema';
@@ -146,6 +151,7 @@ export type {
   ColorOverrideValue,
   OutlineValue,
   VisibilityValue,
+  ClipPlane,
   CameraIntentValue,
   LightingIntentValue,
   EffectiveVisualState,
@@ -188,6 +194,10 @@ export type {
   FocusFrameOptions,
 } from './focus';
 
+// State Manager (chapter 09, P6-T1).
+export { createStateManager } from './state';
+export type { StateManager, StateManagerOptions, SerializedState } from './state';
+
 // Selection Manager (P4-T1).
 export { createSelectionManager } from './selection';
 export type {
@@ -218,6 +228,9 @@ export type {
   ModelErrorEvent,
   FocusStartedEvent,
   FocusEndedEvent,
+  StateChangingEvent,
+  StateChangedEvent,
+  ModifierChangedEvent,
   SelectionChangedEvent,
   SelectionHoverEvent,
   HotspotActivatedEvent,

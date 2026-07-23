@@ -97,6 +97,36 @@ describe('createRenderStateApplicator', () => {
     for (const obj of scene.getNodeIndex()!.resolve('dup')) expect(obj.visible).toBe(false);
   });
 
+  it('applies cutaway clip planes and reverts to none, enabling local clipping', () => {
+    const scene = sceneWith('a');
+    let localClipping = false;
+    const renderer = {
+      getThreeRenderer: () => ({
+        get localClippingEnabled() {
+          return localClipping;
+        },
+        set localClippingEnabled(v: boolean) {
+          localClipping = v;
+        },
+      }),
+    } as unknown as Parameters<typeof createRenderStateApplicator>[0]['renderer'];
+    const applicator = createRenderStateApplicator({ scene, renderer });
+    const material = (scene.getNodeIndex()!.resolve('a')[0] as THREE.Mesh)
+      .material as THREE.MeshStandardMaterial;
+    expect(material.clippingPlanes).toBeNull();
+
+    applicator.applyNodeStates([
+      { identity: 'a', state: state({ clip: [{ normal: [1, 0, 0], offset: 0.1 }] }) },
+    ]);
+    expect(localClipping).toBe(true);
+    expect(material.clippingPlanes).toHaveLength(1);
+    // constant = -offset for a keep-half-space where normal·x ≥ offset.
+    expect(material.clippingPlanes![0]!.constant).toBeCloseTo(-0.1, 6);
+
+    applicator.applyNodeStates([{ identity: 'a', state: REST_VISUAL_STATE }]);
+    expect(material.clippingPlanes).toBeNull(); // reverted to rest
+  });
+
   it('no-ops when there is no node index or the identity is unknown', () => {
     const scene = createSceneManager();
     const applicator = createRenderStateApplicator({ scene });
