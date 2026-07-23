@@ -62,6 +62,24 @@ export interface FocusEndedEvent {
   readonly current: Address | null;
 }
 
+/** A base-state transition is starting (P6-T1). */
+export interface StateChangingEvent {
+  readonly from: string | null;
+  readonly to: string;
+}
+
+/** The macroscopic state changed: active base + active modifier ids. */
+export interface StateChangedEvent {
+  readonly base: string | null;
+  readonly modifiers: readonly string[];
+}
+
+/** A modifier region was toggled on/off. */
+export interface ModifierChangedEvent {
+  readonly id: string;
+  readonly on: boolean;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -74,4 +92,7 @@ export interface EngineEventMap {
   'hotspot:hover': HotspotHoverEvent;
   'focus:started': FocusStartedEvent;
   'focus:ended': FocusEndedEvent;
+  'state:changing': StateChangingEvent;
+  'state:changed': StateChangedEvent;
+  'modifier:changed': ModifierChangedEvent;
 }
