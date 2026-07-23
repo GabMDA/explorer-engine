@@ -165,6 +165,74 @@ export interface HotspotConfig {
   readonly priority: number;
 }
 
+// --- States (chapter 09) — declarative, layer-based, transforms ABSOLUTE ---------
+
+/** Absolute transform offset from the rest pose (chapter 19 §19.3.3; no `relative`). */
+export interface TransformValueConfig {
+  readonly translate?: readonly [number, number, number];
+  readonly rotate?: readonly [number, number, number];
+  readonly scale?: number | readonly [number, number, number];
+}
+
+/** A half-space clipping plane for cutaway (chapter 09 §9.2.1). */
+export interface ClipPlaneConfig {
+  readonly normal: readonly [number, number, number];
+  readonly offset: number;
+}
+
+/**
+ * A layer a state publishes to the resolver (chapter 05 §5.3.9, chapter 09 §9.4).
+ * Discriminated by `channel`; targets are typed Addresses (C5). `transform` values
+ * are ABSOLUTE offsets from the rest pose — the v1 `relative` flag is rejected.
+ */
+export type StateLayerConfig =
+  | {
+      readonly target: Address;
+      readonly channel: 'transform';
+      readonly value: TransformValueConfig;
+    }
+  | { readonly target: Address; readonly channel: 'opacity'; readonly value: number }
+  | {
+      readonly target: Address;
+      readonly channel: 'colorOverride';
+      readonly value: { readonly color: string; readonly intensity: number };
+    }
+  | {
+      readonly target: Address;
+      readonly channel: 'visibility';
+      readonly value: 'visible' | 'hidden';
+    }
+  | {
+      readonly target: Address;
+      readonly channel: 'clip';
+      readonly value: readonly ClipPlaneConfig[];
+    };
+
+/** A state's camera intent — an inline pose (chapter 09 §9.4). Priority `state`. */
+export interface StateCameraIntentConfig {
+  readonly position: readonly [number, number, number];
+  readonly target: readonly [number, number, number];
+}
+
+/**
+ * A declarative state (chapter 09 §9.4). `region: 'base'` = mutually-exclusive main
+ * region; any other string = a parallel modifier region (X-ray, cutaway…). Activating
+ * a state PUBLISHES its layers; leaving it REMOVES them (recomposition, never restore).
+ */
+export interface StateConfig {
+  readonly id: string;
+  readonly label: string;
+  /** `'base'` (exclusive main region) or a modifier region id (parallel). */
+  readonly region: string;
+  /** Allowed source bases (bases only); `null` = any. */
+  readonly allowedFrom: readonly string[] | null;
+  /** Modifier region ids (or state ids) this state is mutually exclusive with. */
+  readonly excludes: readonly string[];
+  readonly layers: readonly StateLayerConfig[];
+  readonly cameraIntent: StateCameraIntentConfig | null;
+  readonly transition: TransitionSpec | null;
+}
+
 /**
  * A fully-defaulted, validated configuration. This is what the Config Loader
  * produces (immutable). Every optional input field has been resolved to a value.
@@ -179,6 +247,9 @@ export interface ResolvedConfig {
   readonly components: readonly ComponentConfig[];
   readonly hotspots: readonly HotspotConfig[];
   readonly focus: FocusConfig;
+  readonly states: readonly StateConfig[];
+  /** Base state entered at load (chapter 09 §9.9); `null` = rest pose. */
+  readonly initialState: string | null;
 }
 
 /** A single validation problem, addressed by a JSON-ish path. */
