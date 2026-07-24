@@ -100,7 +100,9 @@ export const DEFAULT_THEME_TOKENS_LIGHT: ThemeTokens = {
   colorSurface: '#f5f6f8',
   colorText: '#14161a',
   colorTextMuted: '#4b515c',
-  colorBorder: '#d8dbe2',
+  // WCAG 1.4.11 (non-text contrast, >=3:1) — this token draws button/track
+  // boundaries with no other visual cue, so it cannot be a barely-visible tint.
+  colorBorder: '#7c8598',
   colorSuccess: '#1e7d34',
   colorWarning: '#8a5b00',
   colorDanger: '#c62828',
@@ -127,7 +129,7 @@ export const DEFAULT_THEME_TOKENS_LIGHT: ThemeTokens = {
   shadowMd: '0 4px 12px rgba(0,0,0,0.12)',
   shadowLg: '0 12px 32px rgba(0,0,0,0.18)',
   borderWidth: '1px',
-  borderColor: '#d8dbe2',
+  borderColor: '#7c8598',
   durationFast: '120ms',
   durationBase: '240ms',
   durationSlow: '400ms',
@@ -141,7 +143,10 @@ export const DEFAULT_THEME_TOKENS_LIGHT: ThemeTokens = {
   hotspotColor: '#0b63ce',
   hotspotColorActive: '#0b63ce',
   hotspotSize: '14px',
-  outlineColor: '#3ba7ff',
+  // WCAG 1.4.11: the previous #3ba7ff only reached ~2.4:1 against light
+  // surfaces — reusing colorAccent clears 3:1 comfortably (ch.12 §12.8 focus
+  // visible depends on this for its outline).
+  outlineColor: '#0b63ce',
   outlineThickness: '2px',
 };
 
@@ -152,17 +157,20 @@ export const DEFAULT_THEME_TOKENS_DARK: ThemeTokens = {
   colorSurface: '#1b1d22',
   colorText: '#f5f5f0',
   colorTextMuted: '#a7acb8',
-  colorBorder: '#33363e',
+  colorBorder: '#6b7284',
   colorSuccess: '#4caf50',
   colorWarning: '#e0a72e',
   colorDanger: '#ef5350',
   shadowSm: '0 1px 2px rgba(0,0,0,0.4)',
   shadowMd: '0 4px 12px rgba(0,0,0,0.45)',
   shadowLg: '0 12px 32px rgba(0,0,0,0.5)',
-  borderColor: '#33363e',
+  borderColor: '#6b7284',
   sceneBackground: '#111216',
   hotspotColor: '#5db3ff',
   hotspotColorActive: '#5db3ff',
+  // Explicit override: the light outlineColor (#0b63ce) only reaches ~3:1 on
+  // dark surfaces, well under AA headroom — #3ba7ff clears it comfortably.
+  outlineColor: '#3ba7ff',
 };
 
 export const DEFAULT_THEME: ThemeConfig = { preset: 'auto', tokens: {}, hotspotStyle: {} };
