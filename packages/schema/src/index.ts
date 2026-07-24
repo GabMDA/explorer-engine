@@ -17,6 +17,9 @@ export {
   DEFAULT_THEME_TOKENS_LIGHT,
   DEFAULT_THEME_TOKENS_DARK,
   DEFAULT_I18N,
+  DEFAULT_PERFORMANCE,
+  DEFAULT_QUALITY,
+  QUALITY_LEVELS,
 } from './defaults';
 export {
   parseHexColor,
@@ -56,6 +59,11 @@ export type {
   ThemeConfig,
   I18nText,
   I18nConfig,
+  PerformanceBudgetConfig,
+  PerformanceConfig,
+  QualityLevel,
+  QualityLeverConfig,
+  QualityConfig,
   Capability,
   PluginEntry,
   ResolvedConfig,

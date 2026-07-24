@@ -269,6 +269,49 @@ export interface I18nConfig {
   readonly sources: Readonly<Record<string, string>>;
 }
 
+// --- Performance & quality (chapter 05, chapter 14) — measurement budgets and ---
+// the discrete quality tiers the adaptive Quality Manager degrades/upgrades between.
+
+/** A frame budget for one device class (chapter 14 §14.1.1). */
+export interface PerformanceBudgetConfig {
+  /** Target frames per second for this device class. */
+  readonly targetFps: number;
+  /** Per-frame time budget in ms; exceeding it repeatedly triggers a quality downgrade. */
+  readonly frameBudgetMs: number;
+}
+
+/**
+ * Measurement configuration (chapter 05, chapter 14 §14.1.1/§14.8). Desktop and
+ * mobile budgets are both declared; picking which applies to the current device
+ * is a host/adapter concern (headless core does no device sniffing, L1/L8).
+ */
+export interface PerformanceConfig {
+  readonly desktop: PerformanceBudgetConfig;
+  readonly mobile: PerformanceBudgetConfig;
+  /** Whether the developer performance/quality overlay is enabled (ch.14 §14.8). */
+  readonly overlay: boolean;
+}
+
+/** A discrete quality tier, low to high (chapter 14 §14.2.2/§14.3). */
+export type QualityLevel = 'low' | 'medium' | 'high';
+
+/** The renderer levers a quality tier drives — only levers the ports already expose. */
+export interface QualityLeverConfig {
+  /** Upper bound applied to the device pixel ratio at this tier (ch.14 §14.3). */
+  readonly maxPixelRatio: number;
+}
+
+/**
+ * Adaptive-quality configuration (chapter 05, chapter 14 §14.2.2). `levels` maps
+ * every {@link QualityLevel} to the lever values applied when that tier is active.
+ */
+export interface QualityConfig {
+  /** Enable automatic degrade/upgrade based on measured frame budget. */
+  readonly adaptive: boolean;
+  readonly initialLevel: QualityLevel;
+  readonly levels: Readonly<Record<QualityLevel, QualityLeverConfig>>;
+}
+
 // --- Plugins (chapter 05 §5.3.1bis/§5.3.14, chapter 10, ADR-006) ----------------
 
 /**
@@ -314,6 +357,8 @@ export interface ResolvedConfig {
   readonly initialState: string | null;
   readonly theme: ThemeConfig;
   readonly i18n: I18nConfig;
+  readonly performance: PerformanceConfig;
+  readonly quality: QualityConfig;
   readonly requiredCapabilities: readonly Capability[];
   readonly plugins: readonly PluginEntry[];
 }

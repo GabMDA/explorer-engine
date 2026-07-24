@@ -12,6 +12,9 @@ import type {
   ThemeConfig,
   ThemeTokens,
   I18nConfig,
+  PerformanceConfig,
+  QualityConfig,
+  QualityLevel,
 } from './types';
 
 /** The schema version this build implements. */
@@ -161,3 +164,25 @@ export const DEFAULT_THEME_TOKENS_DARK: ThemeTokens = {
 export const DEFAULT_THEME: ThemeConfig = { preset: 'auto', tokens: {}, hotspotStyle: {} };
 
 export const DEFAULT_I18N: I18nConfig = { locales: [], sources: {} };
+
+// --- Performance & quality (chapter 14 §14.1.1/§14.3/§14.9) ---------------------
+
+/** Ordered low → high (chapter 14 §14.2.2 degrade/upgrade direction). */
+export const QUALITY_LEVELS: readonly QualityLevel[] = ['low', 'medium', 'high'];
+
+export const DEFAULT_PERFORMANCE: PerformanceConfig = {
+  desktop: { targetFps: 60, frameBudgetMs: 16.6 },
+  mobile: { targetFps: 30, frameBudgetMs: 33.3 },
+  overlay: false,
+};
+
+export const DEFAULT_QUALITY: QualityConfig = {
+  adaptive: true,
+  initialLevel: 'high',
+  levels: {
+    // Pixel ratio caps (ch.14 §14.3 "plafonné ≤2" / §14.9 "plafonné plus bas" mobile).
+    low: { maxPixelRatio: 1 },
+    medium: { maxPixelRatio: 1.5 },
+    high: { maxPixelRatio: 2 },
+  },
+};

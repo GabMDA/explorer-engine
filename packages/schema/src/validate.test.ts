@@ -394,6 +394,86 @@ describe('validateConfig — i18n (chapter 05 §5.3.15)', () => {
   });
 });
 
+describe('validateConfig — performance (chapter 14 §14.1.1/§14.8)', () => {
+  it('defaults desktop/mobile budgets and overlay=false', () => {
+    const r = validateConfig(minimal);
+    expect(r.value?.performance).toEqual({
+      desktop: { targetFps: 60, frameBudgetMs: 16.6 },
+      mobile: { targetFps: 30, frameBudgetMs: 33.3 },
+      overlay: false,
+    });
+  });
+
+  it('accepts explicit budgets and overlay flag', () => {
+    const r = validateConfig({
+      ...minimal,
+      performance: {
+        desktop: { targetFps: 120, frameBudgetMs: 8.3 },
+        mobile: { targetFps: 45, frameBudgetMs: 22 },
+        overlay: true,
+      },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.performance.desktop).toEqual({ targetFps: 120, frameBudgetMs: 8.3 });
+    expect(r.value?.performance.mobile).toEqual({ targetFps: 45, frameBudgetMs: 22 });
+    expect(r.value?.performance.overlay).toBe(true);
+  });
+
+  it('clamps an out-of-range budget and warns', () => {
+    const r = validateConfig({
+      ...minimal,
+      performance: { desktop: { targetFps: 1000, frameBudgetMs: 16.6 } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.performance.desktop.targetFps).toBe(240);
+    expect(r.warnings.some((w) => w.path === 'performance.desktop.targetFps')).toBe(true);
+  });
+
+  it('rejects a non-object performance/budget', () => {
+    const r = validateConfig({ ...minimal, performance: 'fast' });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'performance')).toBe(true);
+  });
+});
+
+describe('validateConfig — quality (chapter 14 §14.2.2/§14.3)', () => {
+  it('defaults adaptive=true, initialLevel="high", and pixel-ratio-capped levels', () => {
+    const r = validateConfig(minimal);
+    expect(r.value?.quality).toEqual({
+      adaptive: true,
+      initialLevel: 'high',
+      levels: {
+        low: { maxPixelRatio: 1 },
+        medium: { maxPixelRatio: 1.5 },
+        high: { maxPixelRatio: 2 },
+      },
+    });
+  });
+
+  it('accepts a partial levels override, keeping defaults for the rest', () => {
+    const r = validateConfig({
+      ...minimal,
+      quality: { initialLevel: 'medium', levels: { low: { maxPixelRatio: 0.75 } } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.quality.initialLevel).toBe('medium');
+    expect(r.value?.quality.levels.low).toEqual({ maxPixelRatio: 0.75 });
+    expect(r.value?.quality.levels.high).toEqual({ maxPixelRatio: 2 }); // untouched default
+  });
+
+  it('rejects an invalid initialLevel', () => {
+    const r = validateConfig({ ...minimal, quality: { initialLevel: 'ultra' } });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'quality.initialLevel')).toBe(true);
+  });
+
+  it('can disable adaptive quality', () => {
+    const r = validateConfig({ ...minimal, quality: { adaptive: false } });
+    expect(r.ok).toBe(true);
+    expect(r.value?.quality.adaptive).toBe(false);
+  });
+});
+
 describe('validateConfig — requiredCapabilities (chapter 05 §5.3.1bis)', () => {
   it('defaults to an empty array', () => {
     const r = validateConfig(minimal);
