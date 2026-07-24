@@ -1,0 +1,218 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "title": "Reference Gaming PC",
+    "description": "Explorer Engine reference package (P10-T2) — a complex real-world object exercising multiple states (incl. exploded and x-ray), a guided tour, the measure plugin, two-language i18n, panels, focus and a custom theme.",
+    "defaultLocale": "en"
+  },
+  "model": {
+    "src": "models/gaming-pc.glb",
+    "frameOnLoad": true
+  },
+  "environment": {
+    "background": { "kind": "gradient", "top": "#1a0f2e", "bottom": "#05030a" },
+    "source": "neutral-room",
+    "intensity": 1
+  },
+  "lighting": { "preset": "night" },
+  "camera": {
+    "fov": 50,
+    "controls": { "minDistance": 1, "maxDistance": 10, "enablePan": true, "enableZoom": true }
+  },
+  "components": [
+    { "id": "case", "label": { "$t": "component.case" }, "nodes": [{ "explorerId": "case" }] },
+    {
+      "id": "side-panel",
+      "label": { "$t": "component.sidePanel" },
+      "nodes": [{ "explorerId": "side-panel" }]
+    },
+    {
+      "id": "motherboard",
+      "label": { "$t": "component.motherboard" },
+      "nodes": [{ "explorerId": "motherboard" }]
+    },
+    {
+      "id": "cpu-cooler",
+      "label": { "$t": "component.cpuCooler" },
+      "nodes": [{ "explorerId": "cpu-cooler" }]
+    },
+    { "id": "gpu", "label": { "$t": "component.gpu" }, "nodes": [{ "explorerId": "gpu" }] },
+    {
+      "id": "ram",
+      "label": { "$t": "component.ram" },
+      "nodes": [{ "explorerId": "ram-stick-1" }, { "explorerId": "ram-stick-2" }]
+    },
+    { "id": "psu", "label": { "$t": "component.psu" }, "nodes": [{ "explorerId": "psu" }] }
+  ],
+  "focus": {
+    "padding": 1.8,
+    "dimOthers": true,
+    "dimOpacity": 0.12,
+    "outline": { "enabled": true, "color": "#7c3aed", "thickness": 1.5 },
+    "transition": { "duration": 550, "easing": "easeInOut" }
+  },
+  "hotspots": [
+    {
+      "id": "hs-open",
+      "label": { "$t": "hotspot.openPanel" },
+      "anchor": { "kind": "component", "id": "side-panel" },
+      "action": { "type": "goToState", "state": "open" },
+      "visibleInStates": ["closed"]
+    },
+    {
+      "id": "hs-motherboard",
+      "label": { "$t": "hotspot.motherboard" },
+      "anchor": { "kind": "component", "id": "motherboard" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "motherboard" } },
+      "visibleInStates": ["open", "exploded"],
+      "occludable": false
+    },
+    {
+      "id": "hs-cpu-cooler",
+      "label": { "$t": "hotspot.cpuCooler" },
+      "anchor": { "kind": "component", "id": "cpu-cooler" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "cpu-cooler" } },
+      "visibleInStates": ["open", "exploded"],
+      "occludable": false
+    },
+    {
+      "id": "hs-gpu",
+      "label": { "$t": "hotspot.gpu" },
+      "anchor": { "kind": "component", "id": "gpu" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "gpu" } },
+      "visibleInStates": ["open", "exploded"],
+      "occludable": false
+    },
+    {
+      "id": "hs-ram",
+      "label": { "$t": "hotspot.ram" },
+      "anchor": { "kind": "component", "id": "ram" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "ram" } },
+      "visibleInStates": ["open", "exploded"],
+      "occludable": false
+    },
+    {
+      "id": "hs-psu",
+      "label": { "$t": "hotspot.psu" },
+      "anchor": { "kind": "component", "id": "psu" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "psu" } },
+      "visibleInStates": ["open", "exploded"],
+      "occludable": false
+    },
+    {
+      "id": "hs-xray",
+      "label": { "$t": "hotspot.xray" },
+      "anchor": { "kind": "component", "id": "case" },
+      "action": { "type": "goToState", "state": "xray" },
+      "visibleInStates": null
+    }
+  ],
+  "states": [
+    {
+      "id": "closed",
+      "label": { "$t": "state.closed" },
+      "region": "base",
+      "allowedFrom": null,
+      "layers": []
+    },
+    {
+      "id": "open",
+      "label": { "$t": "state.open" },
+      "region": "base",
+      "allowedFrom": null,
+      "layers": [
+        {
+          "target": { "kind": "component", "id": "side-panel" },
+          "channel": "transform",
+          "value": { "translate": [0.55, 0, 0] }
+        }
+      ],
+      "cameraIntent": { "position": [1.6, 0.3, 1.4], "target": [-0.05, 0, -0.1] },
+      "transition": { "duration": 600, "easing": "easeInOut" }
+    },
+    {
+      "id": "exploded",
+      "label": { "$t": "state.exploded" },
+      "region": "base",
+      "allowedFrom": null,
+      "layers": [
+        {
+          "target": { "kind": "component", "id": "side-panel" },
+          "channel": "transform",
+          "value": { "translate": [0.9, 0, 0] }
+        },
+        {
+          "target": { "kind": "component", "id": "motherboard" },
+          "channel": "transform",
+          "value": { "translate": [0, 0, -0.55] }
+        },
+        {
+          "target": { "kind": "component", "id": "cpu-cooler" },
+          "channel": "transform",
+          "value": { "translate": [0, 0.5, 0] }
+        },
+        {
+          "target": { "kind": "component", "id": "gpu" },
+          "channel": "transform",
+          "value": { "translate": [0, -0.3, 0.35] }
+        },
+        {
+          "target": { "kind": "component", "id": "ram" },
+          "channel": "transform",
+          "value": { "translate": [0, 0.55, 0.15] }
+        },
+        {
+          "target": { "kind": "component", "id": "psu" },
+          "channel": "transform",
+          "value": { "translate": [0, -0.5, 0] }
+        }
+      ],
+      "cameraIntent": { "position": [2.6, 0.8, 2.4], "target": [0, -0.1, -0.1] },
+      "transition": { "duration": 700, "easing": "easeInOut" }
+    },
+    {
+      "id": "xray",
+      "label": { "$t": "state.xray" },
+      "region": "xray",
+      "allowedFrom": null,
+      "excludes": [],
+      "layers": [
+        {
+          "target": { "kind": "component", "id": "case" },
+          "channel": "opacity",
+          "value": 0.15
+        }
+      ]
+    }
+  ],
+  "initialState": "closed",
+  "theme": {
+    "preset": "dark",
+    "tokens": { "colorAccent": "#7c3aed" },
+    "hotspotStyle": { "hotspotColor": "#a78bfa", "hotspotColorActive": "#7c3aed" }
+  },
+  "requiredCapabilities": [],
+  "plugins": [
+    {
+      "id": "guided-tour",
+      "enabled": true,
+      "options": {
+        "steps": ["case", "side-panel", "motherboard", "cpu-cooler", "gpu", "ram", "psu"],
+        "narration": [
+          "The tower case, closed.",
+          "Slide the side panel open to see inside.",
+          "The motherboard carries every other component.",
+          "The CPU cooler keeps the processor underneath it cool.",
+          "The graphics card renders the display output.",
+          "System memory, plugged into the motherboard.",
+          "The power supply feeds every component in the case."
+        ]
+      }
+    },
+    { "id": "measure", "enabled": true }
+  ],
+  "i18n": {
+    "locales": ["en", "de"],
+    "sources": { "en": "locales/en.json", "de": "locales/de.json" }
+  }
+}

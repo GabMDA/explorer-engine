@@ -1,0 +1,20 @@
+{
+  "component.case": "Gehäuse",
+  "component.sidePanel": "Seitenteil",
+  "component.motherboard": "Hauptplatine",
+  "component.cpuCooler": "CPU-Kühler",
+  "component.gpu": "Grafikkarte",
+  "component.ram": "Arbeitsspeicher",
+  "component.psu": "Netzteil",
+  "hotspot.openPanel": "Seitenteil öffnen",
+  "hotspot.motherboard": "Hauptplatine untersuchen",
+  "hotspot.cpuCooler": "CPU-Kühler untersuchen",
+  "hotspot.gpu": "Grafikkarte untersuchen",
+  "hotspot.ram": "Arbeitsspeicher untersuchen",
+  "hotspot.psu": "Netzteil untersuchen",
+  "hotspot.xray": "Röntgenansicht umschalten",
+  "state.closed": "Geschlossen",
+  "state.open": "Offen",
+  "state.exploded": "Explosionsansicht",
+  "state.xray": "Röntgenansicht"
+}

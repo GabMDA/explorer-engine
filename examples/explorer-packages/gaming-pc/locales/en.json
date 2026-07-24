@@ -1,0 +1,20 @@
+{
+  "component.case": "Case",
+  "component.sidePanel": "Side Panel",
+  "component.motherboard": "Motherboard",
+  "component.cpuCooler": "CPU Cooler",
+  "component.gpu": "Graphics Card",
+  "component.ram": "Memory",
+  "component.psu": "Power Supply",
+  "hotspot.openPanel": "Open the side panel",
+  "hotspot.motherboard": "Inspect the motherboard",
+  "hotspot.cpuCooler": "Inspect the CPU cooler",
+  "hotspot.gpu": "Inspect the graphics card",
+  "hotspot.ram": "Inspect the memory",
+  "hotspot.psu": "Inspect the power supply",
+  "hotspot.xray": "Toggle X-ray view",
+  "state.closed": "Closed",
+  "state.open": "Open",
+  "state.exploded": "Exploded",
+  "state.xray": "X-Ray"
+}

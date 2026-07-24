@@ -1,0 +1,9 @@
+{
+  "name": "reference-gaming-pc",
+  "version": "1.0.0",
+  "author": "Explorer Engine",
+  "license": "UNLICENSED",
+  "description": "Complex reference Explorer Package (roadmap P10-T2) — a gaming PC tower with seven components, four states (closed/open/exploded/x-ray), a declarative Guided Tour, the Measure plugin, an English/German locale pair and a custom theme.",
+  "createdAt": "2026-07-24",
+  "tags": ["reference", "complex", "gaming-pc", "p10-t2"]
+}
