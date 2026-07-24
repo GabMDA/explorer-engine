@@ -37,6 +37,17 @@ export type {
   EnvironmentSource,
   EnvironmentSpec,
   EnvironmentPort,
+  UiDescriptor,
+  ToolbarItemKind,
+  ToolbarItemDescriptor,
+  BreadcrumbSegmentDescriptor,
+  PanelBlock,
+  PanelDescriptor,
+  LoaderStateDescriptor,
+  HotspotMarkerDescriptor,
+  ShellDescriptor,
+  UiAction,
+  UiPort,
 } from './ports';
 
 export { createOrbitControls } from './controls';
@@ -115,11 +126,24 @@ export type {
   StateLayerConfig,
   StateCameraIntentConfig,
   StateConfig,
+  ThemePreset,
+  ThemeTokens,
+  ThemeConfig,
+  I18nText,
+  I18nConfig,
   ConfigIssue,
   ValidationResult,
 } from '@explorer-engine/schema';
 // Re-export the schema's data-only default values used by adapters/hosts.
-export { DEFAULT_FOCUS, DEFAULT_FOCUS_TRANSITION, EASE_NAMES } from '@explorer-engine/schema';
+export {
+  DEFAULT_FOCUS,
+  DEFAULT_FOCUS_TRANSITION,
+  EASE_NAMES,
+  DEFAULT_THEME,
+  DEFAULT_THEME_TOKENS_LIGHT,
+  DEFAULT_THEME_TOKENS_DARK,
+  DEFAULT_I18N,
+} from '@explorer-engine/schema';
 
 // Render State Resolver (chapter 19, ADR-001) — the single authority over visual state.
 export {
@@ -198,6 +222,23 @@ export type {
 export { createStateManager } from './state';
 export type { StateManager, StateManagerOptions, SerializedState } from './state';
 
+// Theme Manager (chapter 13, P7-T1).
+export { createThemeManager } from './theme';
+export type {
+  ThemeManager,
+  ThemeManagerOptions,
+  ThemeVariant,
+  SystemThemePreferences,
+} from './theme';
+
+// Accessibility Service (chapter 12 §12.8.1, C17).
+export { createAccessibilityService } from './a11y';
+export type { AccessibilityService, AccessibilityServiceOptions } from './a11y';
+
+// i18n Service (chapter 05 §5.3.15, chapter 12 §12.9, P7-T4).
+export { createI18nService } from './i18n';
+export type { I18nService, I18nServiceOptions, LocaleDictionary } from './i18n';
+
 // Selection Manager (P4-T1).
 export { createSelectionManager } from './selection';
 export type {
@@ -231,6 +272,12 @@ export type {
   StateChangingEvent,
   StateChangedEvent,
   ModifierChangedEvent,
+  ThemeChangedEvent,
+  A11yPoliteness,
+  A11yAnnounceEvent,
+  A11yNavigableEntry,
+  A11yNavigableChangedEvent,
+  I18nLocaleChangedEvent,
   SelectionChangedEvent,
   SelectionHoverEvent,
   HotspotActivatedEvent,

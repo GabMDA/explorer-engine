@@ -13,7 +13,18 @@ export {
   EASE_NAMES,
   DEFAULT_FOCUS,
   DEFAULT_FOCUS_TRANSITION,
+  DEFAULT_THEME,
+  DEFAULT_THEME_TOKENS_LIGHT,
+  DEFAULT_THEME_TOKENS_DARK,
+  DEFAULT_I18N,
 } from './defaults';
+export {
+  parseHexColor,
+  relativeLuminance,
+  contrastRatio,
+  meetsWcagAaNormalText,
+  WCAG_AA_NORMAL_TEXT_RATIO,
+} from './color-contrast';
 export type { MigrationResult } from './migrate';
 export type {
   BackgroundConfig,
@@ -40,6 +51,11 @@ export type {
   StateLayerConfig,
   StateCameraIntentConfig,
   StateConfig,
+  ThemePreset,
+  ThemeTokens,
+  ThemeConfig,
+  I18nText,
+  I18nConfig,
   ResolvedConfig,
   ConfigIssue,
   ValidationResult,

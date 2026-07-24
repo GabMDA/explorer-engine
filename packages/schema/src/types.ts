@@ -233,6 +233,42 @@ export interface StateConfig {
   readonly transition: TransitionSpec | null;
 }
 
+// --- Theme (chapter 05 §5.3.12, chapter 13) — design tokens, cascade resolution --
+
+/** Theme base; `'auto'` follows `prefers-color-scheme` at runtime (ch.13 §13.4). */
+export type ThemePreset = 'light' | 'dark' | 'auto';
+
+/** Flat design-token overrides (semantic/component level, ch.13 §13.2.1). */
+export type ThemeTokens = Readonly<Record<string, string>>;
+
+/**
+ * A package's theme customization (ch.13 §13.7). Resolution is a CASCADE (engine
+ * default → `preset` → `tokens`/`hotspotStyle` overrides → runtime system
+ * preferences) performed by the headless Theme Manager, never here — this is only
+ * the package's declared intent.
+ */
+export interface ThemeConfig {
+  readonly preset: ThemePreset;
+  readonly tokens: ThemeTokens;
+  /** Style overrides for hotspot markers specifically (ch.05 §5.3.12). */
+  readonly hotspotStyle: ThemeTokens;
+}
+
+// --- i18n (chapter 05 §5.3.15) — explicit key form only (v2, C17) ----------------
+
+/**
+ * A displayable string: either a literal, or an explicit i18n key. The v1 `"@key"`
+ * prefix heuristic is gone (ambiguous) — v2 requires the explicit `{ $t }` form.
+ */
+export type I18nText = string | { readonly $t: string };
+
+export interface I18nConfig {
+  /** Available languages; defaults to `[meta.defaultLocale]`. */
+  readonly locales: readonly string[];
+  /** Translation file per locale (`locales/*.json`), resolved by the Config Loader. */
+  readonly sources: Readonly<Record<string, string>>;
+}
+
 /**
  * A fully-defaulted, validated configuration. This is what the Config Loader
  * produces (immutable). Every optional input field has been resolved to a value.
@@ -250,6 +286,8 @@ export interface ResolvedConfig {
   readonly states: readonly StateConfig[];
   /** Base state entered at load (chapter 09 §9.9); `null` = rest pose. */
   readonly initialState: string | null;
+  readonly theme: ThemeConfig;
+  readonly i18n: I18nConfig;
 }
 
 /** A single validation problem, addressed by a JSON-ish path. */

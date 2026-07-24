@@ -24,3 +24,16 @@ export type {
   EnvironmentSpec,
   EnvironmentPort,
 } from './environment-port';
+export type {
+  UiDescriptor,
+  ToolbarItemKind,
+  ToolbarItemDescriptor,
+  BreadcrumbSegmentDescriptor,
+  PanelBlock,
+  PanelDescriptor,
+  LoaderStateDescriptor,
+  HotspotMarkerDescriptor,
+  ShellDescriptor,
+  UiAction,
+  UiPort,
+} from './ui-port';

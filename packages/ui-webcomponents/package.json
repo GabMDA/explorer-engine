@@ -2,7 +2,19 @@
   "name": "@explorer-engine/ui-webcomponents",
   "version": "0.0.0",
   "private": true,
-  "description": "UiPort adapter — default UI implemented with Web Components. No code yet (deferred to P7).",
+  "description": "UiPort adapter — default UI implemented with native Web Components (Shadow DOM, zero framework dependency, ch.12 §12.1.1).",
   "license": "UNLICENSED",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@explorer-engine/core": "0.0.0"
+  }
 }

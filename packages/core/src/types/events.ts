@@ -5,7 +5,8 @@
 // The bus is compile-time checked against this map.
 import type { BoundingBox } from '../ports/scene-port';
 import type { ModelLoadPhase } from '../model/model-loader-port';
-import type { Address, HotspotAction } from '@explorer-engine/schema';
+import type { UiAction } from '../ports/ui-port';
+import type { Address, HotspotAction, ThemeTokens } from '@explorer-engine/schema';
 
 export interface EngineDisposedEvent {
   /** Epoch milliseconds at which disposal occurred. */
@@ -80,6 +81,42 @@ export interface ModifierChangedEvent {
   readonly on: boolean;
 }
 
+/** `'light' | 'dark'` — the resolved theme variant (ch.13 §13.4). Defined here
+ * (rather than in the Theme Manager) to keep the event catalog a leaf module. */
+export type ThemeVariant = 'light' | 'dark';
+
+/** The resolved theme changed (preset switch or system preference change). */
+export interface ThemeChangedEvent {
+  readonly variant: ThemeVariant;
+  readonly tokens: ThemeTokens;
+}
+
+/** Live-region politeness (ch.12 §12.8.1, C17 central A11y service). */
+export type A11yPoliteness = 'polite' | 'assertive';
+
+/** A single announcement raised through the central announcer. */
+export interface A11yAnnounceEvent {
+  readonly message: string;
+  readonly politeness: A11yPoliteness;
+  readonly at: number;
+}
+
+/** An entry in the unified alternative-navigation registry (ch.12 §12.8.1). */
+export interface A11yNavigableEntry {
+  readonly target: Address;
+  readonly label: string;
+}
+
+/** The alt-nav registry (components/hotspots list) was (re)published. */
+export interface A11yNavigableChangedEvent {
+  readonly entries: readonly A11yNavigableEntry[];
+}
+
+/** The active locale changed (ch.05 §5.3.15, `languageSelect` toolbar item). */
+export interface I18nLocaleChangedEvent {
+  readonly locale: string;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -95,4 +132,9 @@ export interface EngineEventMap {
   'state:changing': StateChangingEvent;
   'state:changed': StateChangedEvent;
   'modifier:changed': ModifierChangedEvent;
+  'theme:changed': ThemeChangedEvent;
+  'a11y:announce': A11yAnnounceEvent;
+  'a11y:navigable-changed': A11yNavigableChangedEvent;
+  'i18n:locale-changed': I18nLocaleChangedEvent;
+  'ui:action': UiAction;
 }

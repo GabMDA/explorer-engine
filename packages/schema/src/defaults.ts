@@ -9,6 +9,9 @@ import type {
   EaseName,
   TransitionSpec,
   FocusConfig,
+  ThemeConfig,
+  ThemeTokens,
+  I18nConfig,
 } from './types';
 
 /** The schema version this build implements. */
@@ -79,3 +82,82 @@ export const DEFAULT_FOCUS: FocusConfig = {
   isolate: false,
   transition: DEFAULT_FOCUS_TRANSITION,
 };
+
+// --- Theme (chapter 13 §13.2.2) — engine default design tokens, both accessible
+// (WCAG 2.1 AA verified for colorText/colorBackground/colorSurface — see
+// defaults.test.ts). Non-exhaustive: new tokens are added additively (§13.8).
+
+export const DEFAULT_THEME_TOKENS_LIGHT: ThemeTokens = {
+  colorAccent: '#0b63ce',
+  colorBackground: '#ffffff',
+  colorSurface: '#f5f6f8',
+  colorText: '#14161a',
+  colorTextMuted: '#4b515c',
+  colorBorder: '#d8dbe2',
+  colorSuccess: '#1e7d34',
+  colorWarning: '#8a5b00',
+  colorDanger: '#c62828',
+  fontFamily: "'Inter', system-ui, sans-serif",
+  fontSizeSm: '13px',
+  fontSizeMd: '15px',
+  fontSizeLg: '20px',
+  fontWeightRegular: '400',
+  fontWeightMedium: '500',
+  fontWeightBold: '700',
+  lineHeightTight: '1.2',
+  lineHeightBase: '1.5',
+  'space-1': '4px',
+  'space-2': '8px',
+  'space-3': '12px',
+  'space-4': '16px',
+  'space-6': '24px',
+  'space-8': '32px',
+  radiusSm: '4px',
+  radiusMd: '8px',
+  radiusLg: '16px',
+  radiusFull: '9999px',
+  shadowSm: '0 1px 2px rgba(0,0,0,0.08)',
+  shadowMd: '0 4px 12px rgba(0,0,0,0.12)',
+  shadowLg: '0 12px 32px rgba(0,0,0,0.18)',
+  borderWidth: '1px',
+  borderColor: '#d8dbe2',
+  durationFast: '120ms',
+  durationBase: '240ms',
+  durationSlow: '400ms',
+  easingDefault: 'ease-in-out',
+  zIndexHotspot: '10',
+  zIndexToolbar: '20',
+  zIndexPanel: '30',
+  zIndexModal: '40',
+  iconSize: '20px',
+  sceneBackground: '#f5f6f8',
+  hotspotColor: '#0b63ce',
+  hotspotColorActive: '#0b63ce',
+  hotspotSize: '14px',
+  outlineColor: '#3ba7ff',
+  outlineThickness: '2px',
+};
+
+export const DEFAULT_THEME_TOKENS_DARK: ThemeTokens = {
+  ...DEFAULT_THEME_TOKENS_LIGHT,
+  colorAccent: '#5db3ff',
+  colorBackground: '#111216',
+  colorSurface: '#1b1d22',
+  colorText: '#f5f5f0',
+  colorTextMuted: '#a7acb8',
+  colorBorder: '#33363e',
+  colorSuccess: '#4caf50',
+  colorWarning: '#e0a72e',
+  colorDanger: '#ef5350',
+  shadowSm: '0 1px 2px rgba(0,0,0,0.4)',
+  shadowMd: '0 4px 12px rgba(0,0,0,0.45)',
+  shadowLg: '0 12px 32px rgba(0,0,0,0.5)',
+  borderColor: '#33363e',
+  sceneBackground: '#111216',
+  hotspotColor: '#5db3ff',
+  hotspotColorActive: '#5db3ff',
+};
+
+export const DEFAULT_THEME: ThemeConfig = { preset: 'auto', tokens: {}, hotspotStyle: {} };
+
+export const DEFAULT_I18N: I18nConfig = { locales: [], sources: {} };
