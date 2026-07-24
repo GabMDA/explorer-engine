@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { ScenePort, BoundingBox } from '@explorer-engine/core';
 import type { ThreeSceneHandle } from './internal/handles';
 import type { NodeIndex } from './node-index';
+import { disposeObject3D } from './internal/dispose-object';
 
 export interface SceneManager extends ScenePort, ThreeSceneHandle {
   /** Add an object to the root scene. */
@@ -52,16 +53,7 @@ export function createSceneManager(): SceneManager {
       if (disposed) return;
       disposed = true;
       nodeIndex = null;
-      scene.traverse((object) => {
-        const mesh = object as Partial<THREE.Mesh>;
-        mesh.geometry?.dispose();
-        const material = mesh.material;
-        if (Array.isArray(material)) {
-          for (const m of material) m.dispose();
-        } else {
-          material?.dispose();
-        }
-      });
+      disposeObject3D(scene);
       scene.clear();
     },
   };

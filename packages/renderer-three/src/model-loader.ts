@@ -37,6 +37,7 @@ import type { CameraManager } from './camera-manager';
 import type { ThreeRendererHandle } from './internal/handles';
 import { createNodeIndex } from './node-index';
 import { applyInstancing } from './instancing';
+import { disposeObject3D } from './internal/dispose-object';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -96,25 +97,6 @@ function boxToData(box: THREE.Box3): BoundingBox {
   return { min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z] };
 }
 
-function disposeMaterial(material: THREE.Material): void {
-  for (const value of Object.values(material as unknown as Record<string, unknown>)) {
-    if (value && typeof value === 'object' && (value as THREE.Texture).isTexture === true) {
-      (value as THREE.Texture).dispose();
-    }
-  }
-  material.dispose();
-}
-
-function disposeObject(root: THREE.Object3D): void {
-  root.traverse((node) => {
-    const mesh = node as Partial<THREE.Mesh>;
-    mesh.geometry?.dispose();
-    const material = mesh.material;
-    if (Array.isArray(material)) material.forEach(disposeMaterial);
-    else if (material) disposeMaterial(material);
-  });
-}
-
 export function createModelLoader(options: ModelLoaderOptions): ModelLoaderPort {
   const { resourceManager, scene, camera } = options;
   const loader = new GLTFLoader();
@@ -157,7 +139,7 @@ export function createModelLoader(options: ModelLoaderOptions): ModelLoaderPort 
   const removeCurrent = () => {
     if (current) {
       scene.remove(current);
-      disposeObject(current);
+      disposeObject3D(current);
       current = null;
       scene.setNodeIndex(null); // drop identity references (no leak, L20)
     }
@@ -209,7 +191,7 @@ export function createModelLoader(options: ModelLoaderOptions): ModelLoaderPort 
     }
     // Late result after dispose: release it, insert nothing, emit no model:loaded.
     if (disposed) {
-      disposeObject(gltf.scene);
+      disposeObject3D(gltf.scene);
       throw new ModelLoadError('Model loader disposed', url);
     }
 
