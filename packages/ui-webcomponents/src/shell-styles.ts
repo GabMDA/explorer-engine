@@ -21,6 +21,14 @@ export const SHELL_STYLES = `
     border: none;
     cursor: pointer;
   }
+  /* ch.12 §12.8 "focus visible" (WCAG 2.4.7) — every focusable control in the
+     shell, themed via tokens (never hardcoded) with a comfortable offset so the
+     ring reads clearly on markers/buttons of any size. */
+  button:focus-visible,
+  [tabindex]:focus-visible {
+    outline: var(--ee-outlineThickness, 2px) solid var(--ee-outlineColor, #0b63ce);
+    outline-offset: 2px;
+  }
   .ee-shell { position: absolute; inset: 0; }
 
   .ee-topbar {
@@ -30,7 +38,7 @@ export const SHELL_STYLES = `
     gap: var(--ee-space-4, 16px);
     padding: var(--ee-space-2, 8px) var(--ee-space-4, 16px);
     background: var(--ee-colorSurface, #f5f6f8);
-    border-bottom: var(--ee-borderWidth, 1px) solid var(--ee-colorBorder, #d8dbe2);
+    border-bottom: var(--ee-borderWidth, 1px) solid var(--ee-colorBorder, #7c8598);
   }
   .ee-title { font-weight: var(--ee-fontWeightBold, 700); }
   .ee-breadcrumb { display: flex; align-items: center; gap: var(--ee-space-1, 4px); flex: 1; }
@@ -38,9 +46,8 @@ export const SHELL_STYLES = `
     padding: var(--ee-space-1, 4px) var(--ee-space-2, 8px);
     border-radius: var(--ee-radiusSm, 4px);
   }
-  .ee-breadcrumb button[aria-current="true"] { font-weight: var(--ee-fontWeightMedium, 500); }
-  .ee-breadcrumb button:hover,
-  .ee-breadcrumb button:focus-visible { background: var(--ee-colorBorder, #d8dbe2); }
+  .ee-breadcrumb button[aria-current="page"] { font-weight: var(--ee-fontWeightMedium, 500); }
+  .ee-breadcrumb button:hover { background: var(--ee-colorBorder, #7c8598); }
   .ee-breadcrumb[hidden] { display: none; }
 
   .ee-toolbar {
@@ -51,7 +58,7 @@ export const SHELL_STYLES = `
   .ee-toolbar-item {
     padding: var(--ee-space-1, 4px) var(--ee-space-3, 12px);
     border-radius: var(--ee-radiusMd, 8px);
-    border: var(--ee-borderWidth, 1px) solid var(--ee-colorBorder, #d8dbe2);
+    border: var(--ee-borderWidth, 1px) solid var(--ee-colorBorder, #7c8598);
     transition: background var(--ee-transition-fast) var(--ee-easingDefault, ease-in-out);
   }
   .ee-toolbar-item[aria-pressed="true"] {
@@ -118,7 +125,7 @@ export const SHELL_STYLES = `
     width: 200px;
     height: 4px;
     border-radius: var(--ee-radiusFull, 9999px);
-    background: var(--ee-colorBorder, #d8dbe2);
+    background: var(--ee-colorBorder, #7c8598);
     overflow: hidden;
   }
   .ee-loader-fill { height: 100%; background: var(--ee-colorAccent, #0b63ce); }
@@ -129,7 +136,7 @@ export const SHELL_STYLES = `
     pointer-events: auto;
     padding: var(--ee-space-1, 4px) var(--ee-space-3, 12px);
     border-radius: var(--ee-radiusMd, 8px);
-    border: var(--ee-borderWidth, 1px) solid var(--ee-colorBorder, #d8dbe2);
+    border: var(--ee-borderWidth, 1px) solid var(--ee-colorBorder, #7c8598);
     background: var(--ee-colorSurface, #f5f6f8);
   }
   .ee-navlist {
