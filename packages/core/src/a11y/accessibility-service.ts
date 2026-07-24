@@ -65,6 +65,23 @@ export function createAccessibilityService(
     events.on('model:error', (event) => {
       announce(`Loading error: ${event.message}`, 'assertive');
     }),
+    // Official plugin overlays (ch.10 §10.7) render their own status via a
+    // generic UI slot — plain DOM, invisible to assistive tech on its own
+    // (ch.12 §12.8.1: "les modules ne créent jamais leur propre live region").
+    // Both already emit these typed events; translating them here needs no
+    // new plugin dependency, matching every other module in this list.
+    events.on('tour:step', (event) => {
+      announce(`Tour step ${event.index + 1} of ${event.total}: ${event.target}`);
+    }),
+    events.on('tour:completed', (event) => {
+      announce(event.interrupted ? 'Tour ended' : 'Tour completed');
+    }),
+    events.on('measure:point-added', (event) => {
+      announce(`Measurement point ${event.index + 1} of 2 placed`);
+    }),
+    events.on('measure:completed', (event) => {
+      announce(`Measured distance: ${event.distance.toFixed(3)}`);
+    }),
   ];
 
   return {

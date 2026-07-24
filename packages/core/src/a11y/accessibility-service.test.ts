@@ -64,6 +64,27 @@ describe('createAccessibilityService', () => {
     ]);
   });
 
+  it('translates tour:step/tour:completed/measure:point-added/measure:completed', () => {
+    const events = new EventBus<EngineEventMap>();
+    const messages: string[] = [];
+    events.on('a11y:announce', (e) => messages.push(e.message));
+    createAccessibilityService({ events });
+
+    events.emit('tour:step', { id: 'guided-tour', index: 0, total: 3, target: 'crown' });
+    events.emit('tour:completed', { id: 'guided-tour', interrupted: false });
+    events.emit('tour:completed', { id: 'guided-tour', interrupted: true });
+    events.emit('measure:point-added', { id: 'measure', index: 0, point: [0, 0, 0] });
+    events.emit('measure:completed', { id: 'measure', distance: 1.23456 });
+
+    expect(messages).toEqual([
+      'Tour step 1 of 3: crown',
+      'Tour completed',
+      'Tour ended',
+      'Measurement point 1 of 2 placed',
+      'Measured distance: 1.235',
+    ]);
+  });
+
   it('exposes and replaces the alt-nav registry, emitting a11y:navigable-changed', () => {
     const events = new EventBus<EngineEventMap>();
     const handler = vi.fn();
