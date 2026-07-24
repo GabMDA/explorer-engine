@@ -36,7 +36,9 @@
     "fixtures:compressed": "node scripts/gen-compressed-cube.mjs",
     "fixtures:indexed": "node scripts/gen-indexed-model.mjs",
     "fixtures:instanced": "node scripts/gen-instanced-model.mjs",
+    "fixtures:watch": "node scripts/gen-watch-model.mjs && node scripts/gen-watch-preview.mjs",
     "validate:package": "tsx tools/validate-package/bin.mts",
+    "packages:sync": "node scripts/sync-example-packages.mjs",
     "ci": "npm run typecheck && npm run lint && npm run format && npm run check:arch && npm run test && npm run build"
   },
   "devDependencies": {

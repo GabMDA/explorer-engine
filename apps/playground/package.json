@@ -6,7 +6,9 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "predev": "node ../../scripts/sync-example-packages.mjs",
     "dev": "vite",
+    "prebuild": "node ../../scripts/sync-example-packages.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit"

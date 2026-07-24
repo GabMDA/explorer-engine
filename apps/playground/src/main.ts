@@ -15,6 +15,11 @@
 //   ?config=interactive  components + hotspots + focus, exercises Sprint 2/3
 //   ?config=states       bases + modifiers + UI + plugins, Sprint 4/5/6
 //   ?config=instanced    repeated geometry, exercises automatic instancing (P9-T1)
+//   ?package=<name>      a full Explorer Package (ch.04) mirrored from
+//                        examples/explorer-packages/<name>/ by
+//                        scripts/sync-example-packages.mjs — e.g. ?package=watch
+//                        (roadmap P10-T1). Generic: no package name is ever
+//                        hardcoded here, only the URL parameter is read.
 import {
   createOrbitControls,
   getLightingPreset,
@@ -68,13 +73,40 @@ import { createMeasurePlugin } from '@explorer-engine/plugin-measure';
 
 const DEG2RAD = Math.PI / 180;
 
-const CONFIG_PATH = ((): string => {
-  const which = new URLSearchParams(window.location.search).get('config');
-  if (which === 'indexed') return 'indexed.json';
-  if (which === 'states') return 'states.json';
-  if (which === 'interactive') return 'interactive.json';
-  if (which === 'instanced') return 'instanced.json';
-  return 'minimal.json';
+/**
+ * `configPath` is always resolved relative to `packageBaseUrl` — the SAME
+ * base the Resource Manager then uses for every asset the config references
+ * (ch.04 §4.2.2 rule 2 — "chemins relatifs à la racine du package"; §4.4.2
+ * step 1 — "Résolution de la racine"). The flat dev configs (`minimal.json`,
+ * …) treat the site root as their package root, so both are `'.'`/`'/'`; a
+ * real Explorer Package nested under `packages/<name>/` gets ITS OWN
+ * directory as the root instead — the package name is read from the URL,
+ * never hardcoded.
+ */
+const { configPath: CONFIG_PATH, packageBaseUrl: PACKAGE_BASE_URL } = ((): {
+  configPath: string;
+  packageBaseUrl: string;
+} => {
+  const params = new URLSearchParams(window.location.search);
+  const pkg = params.get('package');
+  if (pkg) {
+    return {
+      configPath: 'config.json',
+      packageBaseUrl: `${window.location.origin}/packages/${pkg}/`,
+    };
+  }
+  const which = params.get('config');
+  const configPath =
+    which === 'indexed'
+      ? 'indexed.json'
+      : which === 'states'
+        ? 'states.json'
+        : which === 'interactive'
+          ? 'interactive.json'
+          : which === 'instanced'
+            ? 'instanced.json'
+            : 'minimal.json';
+  return { configPath, packageBaseUrl: `${window.location.origin}/` };
 })();
 
 /** Approximate progress fraction for the loader bar — the emitted `model:loading`
@@ -100,7 +132,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
   const renderer = createThreeRenderer({ canvas, toneMapping: 'aces-filmic' });
   const resourceManager = createResourceManager({
     transport: createFetchTransport(),
-    baseUrl: window.location.origin + '/',
+    baseUrl: PACKAGE_BASE_URL,
     timeoutMs: 15000,
     timeoutScheduler: {
       schedule: (cb, ms) => {
