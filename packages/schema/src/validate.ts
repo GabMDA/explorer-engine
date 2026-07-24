@@ -17,6 +17,7 @@ import type {
   HotspotAction,
   HotspotAnchor,
   HotspotConfig,
+  I18nConfig,
   LightingConfig,
   LightingPresetId,
   MetaConfig,
@@ -26,6 +27,9 @@ import type {
   StateCameraIntentConfig,
   StateConfig,
   StateLayerConfig,
+  ThemeConfig,
+  ThemePreset,
+  ThemeTokens,
   TransformValueConfig,
   TransitionSpec,
   ValidationResult,
@@ -35,12 +39,17 @@ import {
   DEFAULT_ENVIRONMENT,
   DEFAULT_FOCUS,
   DEFAULT_FOCUS_TRANSITION,
+  DEFAULT_I18N,
   DEFAULT_LIGHTING,
   DEFAULT_META,
+  DEFAULT_THEME,
+  DEFAULT_THEME_TOKENS_DARK,
+  DEFAULT_THEME_TOKENS_LIGHT,
   EASE_NAMES,
   MODEL_DEFAULTS,
   SUPPORTED_SCHEMA_MAJORS,
 } from './defaults';
+import { meetsWcagAaNormalText } from './color-contrast';
 
 const KNOWN_KEYS = new Set([
   'schemaVersion',
@@ -54,7 +63,10 @@ const KNOWN_KEYS = new Set([
   'focus',
   'states',
   'initialState',
+  'theme',
+  'i18n',
 ]);
+const THEME_PRESETS: readonly ThemePreset[] = ['light', 'dark', 'auto'];
 const LIGHTING_PRESETS: readonly LightingPresetId[] = ['studio', 'outdoor', 'night'];
 const ENV_SOURCES: readonly EnvironmentSourceId[] = ['none', 'neutral-room'];
 
@@ -716,6 +728,107 @@ function validateStates(ctx: Ctx, raw: unknown): StateConfig[] {
  * component/group anchors and focus targets must point at declared entities.
  * Node identities are checked against the GLB by the offline validator, not here.
  */
+function validateThemeTokens(ctx: Ctx, raw: unknown, path: string): ThemeTokens {
+  if (raw === undefined) return {};
+  if (!isObject(raw)) {
+    ctx.error(path, 'must be an object of string token overrides');
+    return {};
+  }
+  const tokens: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (!isString(value)) {
+      ctx.error(`${path}.${key}`, 'token value must be a string');
+      continue;
+    }
+    tokens[key] = value;
+  }
+  return tokens;
+}
+
+/**
+ * Warn (never block — ch.13 §13.5) when declared token overrides would fail
+ * WCAG 2.1 AA for text on background/surface, in EITHER variant (a `preset` of
+ * `"auto"` can resolve to either at runtime, so both are checked).
+ */
+function checkThemeContrast(ctx: Ctx, theme: ThemeConfig): void {
+  for (const [variant, base] of [
+    ['light', DEFAULT_THEME_TOKENS_LIGHT],
+    ['dark', DEFAULT_THEME_TOKENS_DARK],
+  ] as const) {
+    const merged = { ...base, ...theme.tokens, ...theme.hotspotStyle };
+    const text = merged['colorText'];
+    const background = merged['colorBackground'];
+    const surface = merged['colorSurface'];
+    if (text === undefined) continue;
+    if (background !== undefined && !meetsWcagAaNormalText(text, background)) {
+      ctx.warn(
+        'theme.tokens',
+        `colorText/colorBackground contrast fails WCAG 2.1 AA in the "${variant}" variant`,
+      );
+    }
+    if (surface !== undefined && !meetsWcagAaNormalText(text, surface)) {
+      ctx.warn(
+        'theme.tokens',
+        `colorText/colorSurface contrast fails WCAG 2.1 AA in the "${variant}" variant`,
+      );
+    }
+  }
+}
+
+function validateTheme(ctx: Ctx, raw: unknown): ThemeConfig {
+  if (raw === undefined) return DEFAULT_THEME;
+  if (!isObject(raw)) {
+    ctx.error('theme', 'must be an object');
+    return DEFAULT_THEME;
+  }
+  let preset: ThemePreset = DEFAULT_THEME.preset;
+  if (raw['preset'] !== undefined) {
+    if (THEME_PRESETS.includes(raw['preset'] as ThemePreset)) preset = raw['preset'] as ThemePreset;
+    else ctx.error('theme.preset', `must be one of ${THEME_PRESETS.join(' | ')}`);
+  }
+  const theme: ThemeConfig = {
+    preset,
+    tokens: validateThemeTokens(ctx, raw['tokens'], 'theme.tokens'),
+    hotspotStyle: validateThemeTokens(ctx, raw['hotspotStyle'], 'theme.hotspotStyle'),
+  };
+  checkThemeContrast(ctx, theme);
+  return theme;
+}
+
+function validateI18n(ctx: Ctx, raw: unknown, defaultLocale: string): I18nConfig {
+  if (raw === undefined) return { ...DEFAULT_I18N, locales: [defaultLocale] };
+  if (!isObject(raw)) {
+    ctx.error('i18n', 'must be an object');
+    return { ...DEFAULT_I18N, locales: [defaultLocale] };
+  }
+  let locales: readonly string[] = [defaultLocale];
+  if (raw['locales'] !== undefined) {
+    if (!Array.isArray(raw['locales']) || !raw['locales'].every(isString)) {
+      ctx.error('i18n.locales', 'must be an array of strings');
+    } else {
+      locales = raw['locales'] as readonly string[];
+    }
+  }
+  const sources: Record<string, string> = {};
+  if (raw['sources'] !== undefined) {
+    if (!isObject(raw['sources'])) {
+      ctx.error('i18n.sources', 'must be an object of { locale: path }');
+    } else {
+      for (const [locale, value] of Object.entries(raw['sources'])) {
+        if (!isString(value)) {
+          ctx.error(`i18n.sources.${locale}`, 'must be a string path');
+          continue;
+        }
+        if (!locales.includes(locale)) {
+          ctx.warn(`i18n.sources.${locale}`, `"${locale}" is not listed in i18n.locales`);
+        }
+        sources[locale] = value;
+      }
+    }
+  }
+  return { locales, sources };
+}
+
 function validateReferences(
   ctx: Ctx,
   components: readonly ComponentConfig[],
@@ -820,9 +933,11 @@ export function validateConfig(raw: unknown): ValidationResult {
       : ctx.str(raw['initialState'], 'initialState', '');
   validateReferences(ctx, components, hotspots, states, initialState);
 
+  const meta = validateMeta(ctx, raw['meta']);
+
   const resolved: ResolvedConfig = {
     schemaVersion: isString(version) ? version : '',
-    meta: validateMeta(ctx, raw['meta']),
+    meta,
     model: validateModel(ctx, raw['model']),
     environment: validateEnvironment(ctx, raw['environment']),
     lighting: validateLighting(ctx, raw['lighting']),
@@ -832,6 +947,8 @@ export function validateConfig(raw: unknown): ValidationResult {
     focus: validateFocus(ctx, raw['focus']),
     states,
     initialState,
+    theme: validateTheme(ctx, raw['theme']),
+    i18n: validateI18n(ctx, raw['i18n'], meta.defaultLocale ?? 'en'),
   };
 
   if (ctx.errors.length > 0) return { ok: false, errors: ctx.errors, warnings: ctx.warnings };

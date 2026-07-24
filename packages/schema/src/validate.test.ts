@@ -323,6 +323,77 @@ describe('validateConfig', () => {
   });
 });
 
+describe('validateConfig — theme (chapter 13)', () => {
+  it('defaults to preset "auto" with no token overrides', () => {
+    const r = validateConfig(minimal);
+    expect(r.value?.theme.preset).toBe('auto');
+    expect(r.value?.theme.tokens).toEqual({});
+  });
+
+  it('accepts a valid preset and token overrides', () => {
+    const r = validateConfig({
+      ...minimal,
+      theme: { preset: 'dark', tokens: { colorAccent: '#c9a227' }, hotspotStyle: { size: '16px' } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.theme.preset).toBe('dark');
+    expect(r.value?.theme.tokens['colorAccent']).toBe('#c9a227');
+    expect(r.value?.theme.hotspotStyle['size']).toBe('16px');
+  });
+
+  it('rejects an unknown preset and a non-string token value', () => {
+    const r = validateConfig({
+      ...minimal,
+      theme: { preset: 'neon', tokens: { colorAccent: 42 } },
+    });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'theme.preset')).toBe(true);
+    expect(r.errors.some((e) => e.path === 'theme.tokens.colorAccent')).toBe(true);
+  });
+
+  it('warns (does not block) when overrides fail WCAG AA contrast', () => {
+    const r = validateConfig({
+      ...minimal,
+      theme: { tokens: { colorText: '#dddddd', colorBackground: '#ffffff' } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.warnings.some((w) => w.message.includes('WCAG 2.1 AA'))).toBe(true);
+  });
+});
+
+describe('validateConfig — i18n (chapter 05 §5.3.15)', () => {
+  it('defaults locales to [meta.defaultLocale]', () => {
+    const r = validateConfig({ ...minimal, meta: { defaultLocale: 'fr' } });
+    expect(r.value?.i18n.locales).toEqual(['fr']);
+    expect(r.value?.i18n.sources).toEqual({});
+  });
+
+  it('accepts explicit locales and sources', () => {
+    const r = validateConfig({
+      ...minimal,
+      i18n: { locales: ['en', 'fr'], sources: { fr: 'locales/fr.json' } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.i18n.locales).toEqual(['en', 'fr']);
+    expect(r.value?.i18n.sources['fr']).toBe('locales/fr.json');
+  });
+
+  it('rejects a non-array locales and warns on a source outside locales', () => {
+    const r = validateConfig({ ...minimal, i18n: { locales: 'en', sources: { de: 'de.json' } } });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'i18n.locales')).toBe(true);
+  });
+
+  it('warns when a source locale is not listed', () => {
+    const r = validateConfig({
+      ...minimal,
+      i18n: { locales: ['en'], sources: { de: 'de.json' } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.warnings.some((w) => w.path === 'i18n.sources.de')).toBe(true);
+  });
+});
+
 describe('migrateConfig', () => {
   it('migrates a 0.9 config (model.file → model.src) up to 1.0, then validates', () => {
     const legacy = { schemaVersion: '0.9', model: { file: 'models/old.glb' } };
