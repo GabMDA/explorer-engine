@@ -231,6 +231,10 @@ export type {
   SystemThemePreferences,
 } from './theme';
 
+// Accessibility Service (chapter 12 §12.8.1, C17).
+export { createAccessibilityService } from './a11y';
+export type { AccessibilityService, AccessibilityServiceOptions } from './a11y';
+
 // Selection Manager (P4-T1).
 export { createSelectionManager } from './selection';
 export type {
@@ -265,6 +269,10 @@ export type {
   StateChangedEvent,
   ModifierChangedEvent,
   ThemeChangedEvent,
+  A11yPoliteness,
+  A11yAnnounceEvent,
+  A11yNavigableEntry,
+  A11yNavigableChangedEvent,
   SelectionChangedEvent,
   SelectionHoverEvent,
   HotspotActivatedEvent,

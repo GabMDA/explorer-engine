@@ -91,6 +91,27 @@ export interface ThemeChangedEvent {
   readonly tokens: ThemeTokens;
 }
 
+/** Live-region politeness (ch.12 §12.8.1, C17 central A11y service). */
+export type A11yPoliteness = 'polite' | 'assertive';
+
+/** A single announcement raised through the central announcer. */
+export interface A11yAnnounceEvent {
+  readonly message: string;
+  readonly politeness: A11yPoliteness;
+  readonly at: number;
+}
+
+/** An entry in the unified alternative-navigation registry (ch.12 §12.8.1). */
+export interface A11yNavigableEntry {
+  readonly target: Address;
+  readonly label: string;
+}
+
+/** The alt-nav registry (components/hotspots list) was (re)published. */
+export interface A11yNavigableChangedEvent {
+  readonly entries: readonly A11yNavigableEntry[];
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -107,5 +128,7 @@ export interface EngineEventMap {
   'state:changed': StateChangedEvent;
   'modifier:changed': ModifierChangedEvent;
   'theme:changed': ThemeChangedEvent;
+  'a11y:announce': A11yAnnounceEvent;
+  'a11y:navigable-changed': A11yNavigableChangedEvent;
   'ui:action': UiAction;
 }
