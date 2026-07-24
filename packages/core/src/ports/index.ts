@@ -2,6 +2,7 @@ export type {
   RendererPort,
   RendererConfig,
   RendererSize,
+  RendererStats,
   ColorSpace,
   ToneMapping,
 } from './renderer-port';

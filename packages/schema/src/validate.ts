@@ -19,12 +19,18 @@ import type {
   HotspotAnchor,
   HotspotConfig,
   I18nConfig,
+  InstancingConfig,
   LightingConfig,
   LightingPresetId,
   MetaConfig,
   ModelConfig,
   NodeRef,
+  PerformanceBudgetConfig,
+  PerformanceConfig,
   PluginEntry,
+  QualityConfig,
+  QualityLevel,
+  QualityLeverConfig,
   ResolvedConfig,
   StateCameraIntentConfig,
   StateConfig,
@@ -44,11 +50,14 @@ import {
   DEFAULT_I18N,
   DEFAULT_LIGHTING,
   DEFAULT_META,
+  DEFAULT_PERFORMANCE,
+  DEFAULT_QUALITY,
   DEFAULT_THEME,
   DEFAULT_THEME_TOKENS_DARK,
   DEFAULT_THEME_TOKENS_LIGHT,
   EASE_NAMES,
   MODEL_DEFAULTS,
+  QUALITY_LEVELS,
   SUPPORTED_SCHEMA_MAJORS,
 } from './defaults';
 import { meetsWcagAaNormalText } from './color-contrast';
@@ -67,6 +76,8 @@ const KNOWN_KEYS = new Set([
   'initialState',
   'theme',
   'i18n',
+  'performance',
+  'quality',
   'requiredCapabilities',
   'plugins',
 ]);
@@ -207,6 +218,25 @@ function validateMeta(ctx: Ctx, raw: unknown): MetaConfig {
   return meta;
 }
 
+function validateInstancing(ctx: Ctx, raw: unknown): InstancingConfig {
+  const fallback = MODEL_DEFAULTS.instancing;
+  if (raw === undefined) return fallback;
+  if (!isObject(raw)) {
+    ctx.error('model.instancing', 'must be an object { enabled?, minCount? }');
+    return fallback;
+  }
+  return {
+    enabled: ctx.bool(raw['enabled'], 'model.instancing.enabled', fallback.enabled),
+    minCount: ctx.numClamped(
+      raw['minCount'],
+      'model.instancing.minCount',
+      fallback.minCount,
+      2,
+      1000,
+    ),
+  };
+}
+
 function validateModel(ctx: Ctx, raw: unknown): ModelConfig {
   if (!isObject(raw)) {
     ctx.error('model', 'is required and must be an object');
@@ -221,6 +251,7 @@ function validateModel(ctx: Ctx, raw: unknown): ModelConfig {
     ktx2: ctx.bool(raw['ktx2'], 'model.ktx2', MODEL_DEFAULTS.ktx2),
     meshopt: ctx.bool(raw['meshopt'], 'model.meshopt', MODEL_DEFAULTS.meshopt),
     frameOnLoad: ctx.bool(raw['frameOnLoad'], 'model.frameOnLoad', MODEL_DEFAULTS.frameOnLoad),
+    instancing: validateInstancing(ctx, raw['instancing']),
   };
 }
 
@@ -834,6 +865,108 @@ function validateI18n(ctx: Ctx, raw: unknown, defaultLocale: string): I18nConfig
   return { locales, sources };
 }
 
+function validatePerformanceBudget(
+  ctx: Ctx,
+  raw: unknown,
+  path: string,
+  fallback: PerformanceBudgetConfig,
+): PerformanceBudgetConfig {
+  if (raw === undefined) return fallback;
+  if (!isObject(raw)) {
+    ctx.error(path, 'must be an object { targetFps, frameBudgetMs }');
+    return fallback;
+  }
+  return {
+    targetFps: ctx.numClamped(raw['targetFps'], `${path}.targetFps`, fallback.targetFps, 1, 240),
+    frameBudgetMs: ctx.numClamped(
+      raw['frameBudgetMs'],
+      `${path}.frameBudgetMs`,
+      fallback.frameBudgetMs,
+      1,
+      1000,
+    ),
+  };
+}
+
+function validatePerformance(ctx: Ctx, raw: unknown): PerformanceConfig {
+  if (raw === undefined) return DEFAULT_PERFORMANCE;
+  if (!isObject(raw)) {
+    ctx.error('performance', 'must be an object');
+    return DEFAULT_PERFORMANCE;
+  }
+  return {
+    desktop: validatePerformanceBudget(
+      ctx,
+      raw['desktop'],
+      'performance.desktop',
+      DEFAULT_PERFORMANCE.desktop,
+    ),
+    mobile: validatePerformanceBudget(
+      ctx,
+      raw['mobile'],
+      'performance.mobile',
+      DEFAULT_PERFORMANCE.mobile,
+    ),
+    overlay: ctx.bool(raw['overlay'], 'performance.overlay', DEFAULT_PERFORMANCE.overlay),
+  };
+}
+
+function validateQualityLever(
+  ctx: Ctx,
+  raw: unknown,
+  path: string,
+  fallback: QualityLeverConfig,
+): QualityLeverConfig {
+  if (raw === undefined) return fallback;
+  if (!isObject(raw)) {
+    ctx.error(path, 'must be an object { maxPixelRatio }');
+    return fallback;
+  }
+  return {
+    maxPixelRatio: ctx.numClamped(
+      raw['maxPixelRatio'],
+      `${path}.maxPixelRatio`,
+      fallback.maxPixelRatio,
+      0.5,
+      4,
+    ),
+  };
+}
+
+function validateQuality(ctx: Ctx, raw: unknown): QualityConfig {
+  if (raw === undefined) return DEFAULT_QUALITY;
+  if (!isObject(raw)) {
+    ctx.error('quality', 'must be an object');
+    return DEFAULT_QUALITY;
+  }
+  let initialLevel: QualityLevel = DEFAULT_QUALITY.initialLevel;
+  if (raw['initialLevel'] !== undefined) {
+    if (QUALITY_LEVELS.includes(raw['initialLevel'] as QualityLevel)) {
+      initialLevel = raw['initialLevel'] as QualityLevel;
+    } else {
+      ctx.error('quality.initialLevel', `must be one of ${QUALITY_LEVELS.join(' | ')}`);
+    }
+  }
+  const levelsRaw = raw['levels'];
+  if (levelsRaw !== undefined && !isObject(levelsRaw)) {
+    ctx.error('quality.levels', 'must be an object keyed by quality level');
+  }
+  const levels = {} as Record<QualityLevel, QualityLeverConfig>;
+  for (const level of QUALITY_LEVELS) {
+    levels[level] = validateQualityLever(
+      ctx,
+      isObject(levelsRaw) ? levelsRaw[level] : undefined,
+      `quality.levels.${level}`,
+      DEFAULT_QUALITY.levels[level],
+    );
+  }
+  return {
+    adaptive: ctx.bool(raw['adaptive'], 'quality.adaptive', DEFAULT_QUALITY.adaptive),
+    initialLevel,
+    levels,
+  };
+}
+
 function validateRequiredCapabilities(ctx: Ctx, raw: unknown): Capability[] {
   if (raw === undefined) return [];
   if (!Array.isArray(raw)) {
@@ -1020,6 +1153,8 @@ export function validateConfig(raw: unknown): ValidationResult {
     initialState,
     theme: validateTheme(ctx, raw['theme']),
     i18n: validateI18n(ctx, raw['i18n'], meta.defaultLocale ?? 'en'),
+    performance: validatePerformance(ctx, raw['performance']),
+    quality: validateQuality(ctx, raw['quality']),
     requiredCapabilities: validateRequiredCapabilities(ctx, raw['requiredCapabilities']),
     plugins: validatePlugins(ctx, raw['plugins']),
   };

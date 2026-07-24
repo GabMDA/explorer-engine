@@ -73,6 +73,8 @@ export interface HotspotMarkerDescriptor {
   readonly x: number;
   readonly y: number;
   readonly occluded: boolean;
+  /** Mirrors `HotspotView.state === 'active'` (ch.07 §7.9 — `aria-pressed`). */
+  readonly active: boolean;
 }
 
 export interface ShellDescriptor {

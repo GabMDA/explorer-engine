@@ -174,6 +174,70 @@ describe('createResourceManager — retry + timeout', () => {
   });
 });
 
+describe('createResourceManager — lazy loading cascade / priorities (chapter 14 §14.5.1)', () => {
+  it('runs loads immediately while under maxConcurrent', async () => {
+    const t = deferredTransport();
+    const rm = createResourceManager({ transport: t.transport, maxConcurrent: 2 });
+    rm.load('a.bin');
+    rm.load('b.bin');
+    expect(t.calls.map((c) => c.url)).toEqual(['a.bin', 'b.bin']);
+  });
+
+  it('queues a load beyond maxConcurrent, starting it only once a slot frees up', async () => {
+    const t = deferredTransport();
+    const rm = createResourceManager({ transport: t.transport, maxConcurrent: 2 });
+
+    const p1 = rm.load('a.bin');
+    rm.load('b.bin');
+    rm.load('c.bin'); // beyond the 2-slot budget — queued, not yet fetched
+    expect(t.calls.map((c) => c.url)).toEqual(['a.bin', 'b.bin']);
+
+    t.controls[0]?.resolve(); // frees a slot
+    await p1;
+    expect(t.calls.map((c) => c.url)).toEqual(['a.bin', 'b.bin', 'c.bin']);
+  });
+
+  it('services queued loads highest-priority-first, not insertion order', async () => {
+    const t = deferredTransport();
+    const rm = createResourceManager({ transport: t.transport, maxConcurrent: 1 });
+
+    rm.load('a.bin'); // takes the single slot immediately
+    rm.load('low.bin', { priority: 'anticipated' });
+    rm.load('mid.bin', { priority: 'on-demand' });
+    rm.load('high.bin', { priority: 'critical' });
+    expect(t.calls.map((c) => c.url)).toEqual(['a.bin']); // only the slot-holder ran
+
+    t.controls[0]?.resolve();
+    await Promise.resolve(); // let the microtask queue drain the next dequeue
+    await Promise.resolve();
+    expect(t.calls[1]?.url).toBe('high.bin'); // highest priority dequeued first, not "low.bin"
+  });
+
+  it('defaults every load to "critical" priority', async () => {
+    const t = deferredTransport();
+    const rm = createResourceManager({ transport: t.transport, maxConcurrent: 1 });
+    rm.load('a.bin');
+    rm.load('b.bin'); // queued at the implicit default priority
+    t.controls[0]?.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(t.calls[1]?.url).toBe('b.bin'); // ran — proves it was queued, not dropped
+  });
+
+  it('rejects a queued (never-started) load on dispose, without ever fetching it', async () => {
+    const t = deferredTransport();
+    const rm = createResourceManager({ transport: t.transport, maxConcurrent: 1 });
+
+    const active = rm.load('a.bin'); // holds the only slot
+    const queued = rm.load('b.bin');
+
+    rm.dispose();
+    await expect(queued).rejects.toBeInstanceOf(ResourceCancelledError);
+    await expect(active).rejects.toBeInstanceOf(ResourceCancelledError); // dispose cancels the active load too
+    expect(t.calls.map((c) => c.url)).toEqual(['a.bin']); // 'b.bin' never reached the transport
+  });
+});
+
 describe('createResourceManager — dispose', () => {
   it('cancels in-flight loads and rejects them as cancelled', async () => {
     const t = deferredTransport();

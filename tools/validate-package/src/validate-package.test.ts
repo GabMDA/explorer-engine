@@ -69,6 +69,19 @@ describe('validatePackage', () => {
     expect(report.errors).toHaveLength(0);
   });
 
+  it('accepts a package declaring performance/quality sections (ch.14 §14.1.1/§14.2.2)', () => {
+    const cfg = JSON.stringify({
+      schemaVersion: '1.0',
+      model: { src: 'models/m.glb' },
+      components: [{ id: 'crown', nodes: [{ explorerId: 'crown' }] }],
+      performance: { desktop: { targetFps: 60, frameBudgetMs: 16.6 }, overlay: true },
+      quality: { adaptive: true, initialLevel: 'medium' },
+    });
+    const report = validatePackage(memFs({ 'config.json': cfg, 'models/m.glb': glbWithNodes }));
+    expect(report.ok).toBe(true);
+    expect(report.errors).toHaveLength(0);
+  });
+
   it('detects a missing config file', () => {
     const report = validatePackage(memFs({}));
     expect(report.ok).toBe(false);

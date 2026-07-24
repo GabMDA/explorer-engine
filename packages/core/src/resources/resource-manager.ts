@@ -4,6 +4,15 @@
 // transient failures within a timeout budget, and releases everything on dispose
 // (ENGINE_CONSTITUTION L20/C16 — cancellable loads, no leak). It knows nothing of
 // the DOM, `fetch`, Three.js, GLB, textures or ObjectURL: only bytes cross its API.
+//
+// Lazy loading in cascade (roadmap P9-T3 ; chapter 14 §14.5.1): every load carries
+// a `priority` tier — critical (config/GLB/base env map, blocks first render),
+// deferred (HD textures, near LODs, right after display), on-demand (panel media,
+// fetched when a panel opens) or anticipated (next likely state/hotspot, preloaded
+// just ahead of the transition). Requests beyond `maxConcurrent` queue and are
+// serviced highest-priority-first when a slot frees up — the mechanism a host or
+// plugin can lean on for any of the four tiers; this package only ever issues
+// `'critical'` loads (its own GLB), since it has no HD/panel/state assets to defer.
 import type { CancellationSource } from './cancellation';
 import { createCancellationSource } from './cancellation';
 import type { ResourceData, ResourceTransport, TimeoutScheduler } from './resource-transport';
@@ -15,6 +24,21 @@ export class ResourceCancelledError extends Error {
     super(message);
     this.name = 'ResourceCancelledError';
   }
+}
+
+/** A lazy-loading-cascade tier (chapter 14 §14.5.1), highest priority first. */
+export type ResourcePriority = 'critical' | 'deferred' | 'on-demand' | 'anticipated';
+
+const PRIORITY_ORDER: Record<ResourcePriority, number> = {
+  critical: 0,
+  deferred: 1,
+  'on-demand': 2,
+  anticipated: 3,
+};
+
+export interface ResourceLoadOptions {
+  /** Cascade tier (chapter 14 §14.5.1). Defaults to `'critical'`. */
+  readonly priority?: ResourcePriority;
 }
 
 export interface ResourceManagerOptions {
@@ -30,11 +54,19 @@ export interface ResourceManagerOptions {
   readonly timeoutScheduler?: TimeoutScheduler;
   /** Whether a transport error is worth retrying. Default: always retry. */
   readonly isRetryable?: (error: unknown) => boolean;
+  /**
+   * Max loads actually in flight at once (chapter 14 §14.5.1 cascade). Requests
+   * beyond this queue and are serviced highest-priority-first as slots free up.
+   * Default 6 (a conventional per-host connection budget) — plenty for the
+   * handful of concurrent loads a typical package issues, so this only bites
+   * under genuine contention.
+   */
+  readonly maxConcurrent?: number;
 }
 
 export interface ResourceManager {
   /** Load the resource at `path` (relative to the base URL, or absolute). */
-  load(path: string): Promise<ResourceData>;
+  load(path: string, options?: ResourceLoadOptions): Promise<ResourceData>;
   /** Cancel all in-flight loads, clear the cache, and block further loads. Idempotent. */
   dispose(): void;
 }
@@ -47,10 +79,46 @@ export function createResourceManager(options: ResourceManagerOptions): Resource
   const timeoutScheduler = options.timeoutScheduler;
   const isRetryable = options.isRetryable ?? (() => true);
 
+  const maxConcurrent = Math.max(1, options.maxConcurrent ?? 6);
+
   const cache = new Map<string, ResourceData>();
   const inflight = new Map<string, Promise<ResourceData>>();
   const inflightSources = new Map<string, CancellationSource>();
   let disposed = false;
+
+  // Priority queue gating how many loads actually run at once (ch.14 §14.5.1).
+  // `run` starts the fetch; `reject` lets dispose() settle a load that never
+  // got its turn, without waiting on a cascade of cancellations to unwind it.
+  interface QueuedTask {
+    readonly priority: ResourcePriority;
+    readonly run: () => void;
+    readonly reject: (reason: unknown) => void;
+  }
+  const queue: QueuedTask[] = [];
+  let activeCount = 0;
+
+  function scheduleOrRun(
+    priority: ResourcePriority,
+    run: () => void,
+    reject: (r: unknown) => void,
+  ): void {
+    if (activeCount < maxConcurrent) {
+      activeCount += 1;
+      run();
+    } else {
+      queue.push({ priority, run, reject });
+      queue.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
+    }
+  }
+
+  function onTaskSettled(): void {
+    activeCount -= 1;
+    const next = queue.shift();
+    if (next) {
+      activeCount += 1;
+      next.run();
+    }
+  }
 
   async function runWithRetry(url: string, request: CancellationSource): Promise<ResourceData> {
     let lastError: unknown;
@@ -84,7 +152,7 @@ export function createResourceManager(options: ResourceManagerOptions): Resource
   }
 
   return {
-    load(path: string): Promise<ResourceData> {
+    load(path: string, loadOptions: ResourceLoadOptions = {}): Promise<ResourceData> {
       if (disposed) {
         return Promise.reject(new ResourceCancelledError('Resource manager disposed'));
       }
@@ -100,19 +168,29 @@ export function createResourceManager(options: ResourceManagerOptions): Resource
       const source = createCancellationSource();
       inflightSources.set(url, source);
 
-      const promise = runWithRetry(url, source).then(
-        (data) => {
-          inflight.delete(url);
-          inflightSources.delete(url);
-          if (!disposed) cache.set(url, data); // never cache after dispose
-          return data;
-        },
-        (error) => {
-          inflight.delete(url); // never cache a failure; allow a future retry
-          inflightSources.delete(url);
-          throw error;
-        },
-      );
+      const promise = new Promise<ResourceData>((resolve, reject) => {
+        scheduleOrRun(
+          loadOptions.priority ?? 'critical',
+          () => {
+            runWithRetry(url, source).then(
+              (data) => {
+                inflight.delete(url);
+                inflightSources.delete(url);
+                if (!disposed) cache.set(url, data); // never cache after dispose
+                resolve(data);
+                onTaskSettled();
+              },
+              (error: unknown) => {
+                inflight.delete(url); // never cache a failure; allow a future retry
+                inflightSources.delete(url);
+                reject(error);
+                onTaskSettled();
+              },
+            );
+          },
+          reject,
+        );
+      });
 
       inflight.set(url, promise);
       return promise;
@@ -125,6 +203,10 @@ export function createResourceManager(options: ResourceManagerOptions): Resource
       inflightSources.clear();
       inflight.clear();
       cache.clear();
+      // Queued-but-not-yet-started loads never get a turn — settle them now
+      // rather than relying on a cascade of cancellations to eventually drain
+      // the queue (ENGINE_CONSTITUTION L20/L24 — no leak, no silent hang).
+      for (const task of queue.splice(0)) task.reject(new ResourceCancelledError());
     },
   };
 }

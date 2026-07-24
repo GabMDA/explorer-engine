@@ -37,6 +37,24 @@ export interface RendererSize {
 }
 
 /**
+ * Renderer statistics for a recent frame (chapter 14 §14.8 instrumentation).
+ * Optional and backend-dependent — a value here is only ever a hint for
+ * diagnostics/quality decisions, never load-bearing for correctness.
+ */
+export interface RendererStats {
+  /** Draw calls issued for the last rendered frame. */
+  readonly drawCalls: number;
+  /** Triangles submitted for the last rendered frame. */
+  readonly triangles: number;
+  /** Geometries currently retained in GPU memory. */
+  readonly geometries: number;
+  /** Textures currently retained in GPU memory. */
+  readonly textures: number;
+  /** Compiled shader programs. `null` when the backend doesn't track it. */
+  readonly programs: number | null;
+}
+
+/**
  * A renderer the core can size, draw and tear down. Backend-agnostic.
  * `render` draws a {@link ScenePort} through a {@link CameraPort}; both handles
  * are produced by the same adapter (the core never sees the backend objects).
@@ -52,6 +70,14 @@ export interface RendererPort {
   getPixelRatio(): number;
   /** Render one frame: draw `scene` as seen by `camera`. */
   render(scene: ScenePort, camera: CameraPort): void;
+  /**
+   * Optional renderer statistics (ch.14 §14.8). A backend that cannot track
+   * this simply omits the method — callers MUST treat a missing `getStats`
+   * exactly like a `null`/absent reading (ENGINE_CONSTITUTION L23), never as
+   * an error. Fully backward-compatible: existing `RendererPort` implementers
+   * need no change.
+   */
+  getStats?(): RendererStats;
   /** Release all GPU resources and the rendering context. Idempotent. */
   dispose(): void;
 }

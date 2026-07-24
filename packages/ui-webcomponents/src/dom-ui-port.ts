@@ -40,7 +40,7 @@ const SHELL_TEMPLATE = `
     </header>
     <div class="ee-markers"></div>
     <div class="ee-panels"></div>
-    <div class="ee-loader" hidden>
+    <div class="ee-loader" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Loading">
       <div class="ee-loader-bar"><div class="ee-loader-fill"></div></div>
       <p class="ee-loader-message"></p>
     </div>
@@ -234,6 +234,13 @@ export function createDomUiPort(options: DomUiPortOptions): UiPort {
       if (disposed) return;
       const panel = panelElements.get(id);
       if (!panel) return;
+      // Focus would otherwise be silently dropped to <body> when the focused
+      // close/action button is removed with its panel (WCAG 2.4.3). Land on an
+      // existing, always-present, already-tabbable control — NOT a synthetic
+      // tabIndex on the shadow host itself, which removes the ENTIRE shadow
+      // tree from sequential (Tab-key) navigation in at least one engine.
+      const active = shell.shadowRoot?.activeElement;
+      if (active && panel.contains(active)) refs.navlistToggle.focus();
       panel.remove();
       panelElements.delete(id);
     },
@@ -284,7 +291,7 @@ export function createDomUiPort(options: DomUiPortOptions): UiPort {
       path.forEach((segment) => {
         const btn = button('');
         btn.textContent = segment.label;
-        if (segment.current) btn.setAttribute('aria-current', 'true');
+        if (segment.current) btn.setAttribute('aria-current', 'page');
         btn.addEventListener('click', () => {
           if (segment.current) return;
           if (segment.target === null) emitAction({ type: 'reset' });
@@ -298,8 +305,12 @@ export function createDomUiPort(options: DomUiPortOptions): UiPort {
       if (disposed) return;
       refs.loader.hidden = !state.visible;
       refs.loader.classList.toggle('ee-loader--indeterminate', state.progress === undefined);
-      refs.loaderFill.style.width = `${Math.round((state.progress ?? 0) * 100)}%`;
+      const percent = Math.round((state.progress ?? 0) * 100);
+      refs.loaderFill.style.width = `${percent}%`;
       refs.loaderMessage.textContent = state.message ?? '';
+      // ch.12 §12.6.1 — progress must be perceivable, not just visual (1.3.1/4.1.2).
+      if (state.progress === undefined) refs.loader.removeAttribute('aria-valuenow');
+      else refs.loader.setAttribute('aria-valuenow', String(percent));
     },
 
     positionMarkers(markers: readonly HotspotMarkerDescriptor[]) {
@@ -311,11 +322,10 @@ export function createDomUiPort(options: DomUiPortOptions): UiPort {
         if (!el) {
           el = button('ee-marker');
           el.addEventListener('click', () => {
-            const current = markerElements.get(marker.id);
             emitAction({
               type: 'custom',
               id: 'hotspot',
-              payload: { hotspotId: marker.id, active: current?.getAttribute('aria-pressed') },
+              payload: { hotspotId: marker.id, active: el?.getAttribute('aria-pressed') },
             });
           });
           markerElements.set(marker.id, el);
@@ -324,6 +334,7 @@ export function createDomUiPort(options: DomUiPortOptions): UiPort {
         el.style.left = `${marker.x * 100}%`;
         el.style.top = `${marker.y * 100}%`;
         el.setAttribute('aria-label', marker.label);
+        el.setAttribute('aria-pressed', String(marker.active)); // ch.07 §7.9 — active state announced
         el.classList.toggle('ee-marker--occluded', marker.occluded);
         el.tabIndex = marker.occluded ? -1 : 0;
       }

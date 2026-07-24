@@ -14,6 +14,11 @@ interface MockRenderer {
   rendered: unknown[][];
   disposed: number;
   contextLost: number;
+  info: {
+    render: { calls: number; triangles: number };
+    memory: { geometries: number; textures: number };
+    programs: { length: number } | null;
+  };
 }
 
 const { instances } = vi.hoisted(() => ({ instances: [] as MockRenderer[] }));
@@ -31,6 +36,11 @@ vi.mock('three', () => {
     rendered: unknown[][] = [];
     disposed = 0;
     contextLost = 0;
+    info = {
+      render: { calls: 0, triangles: 0 },
+      memory: { geometries: 0, textures: 0 },
+      programs: null as { length: number } | null,
+    };
     constructor() {
       instances.push(this as unknown as MockRenderer);
     }
@@ -146,6 +156,28 @@ describe('createThreeRenderer', () => {
     const renderer = createThreeRenderer({ canvas, pixelRatio: 1 });
     const foreign = { getBoundingBox: () => null, dispose: () => {} } as unknown as ScenePort;
     expect(() => renderer.render(foreign, camera)).toThrow(TypeError);
+  });
+
+  it('getStats reads draw calls / triangles / geometries / textures / programs from renderer.info', () => {
+    const renderer = createThreeRenderer({ canvas, pixelRatio: 1 });
+    const mock = instances[0] as MockRenderer;
+    mock.info.render.calls = 4;
+    mock.info.render.triangles = 1200;
+    mock.info.memory.geometries = 2;
+    mock.info.memory.textures = 3;
+    mock.info.programs = { length: 5 };
+    expect(renderer.getStats?.()).toEqual({
+      drawCalls: 4,
+      triangles: 1200,
+      geometries: 2,
+      textures: 3,
+      programs: 5,
+    });
+  });
+
+  it('getStats reports programs as null when the backend does not track them', () => {
+    const renderer = createThreeRenderer({ canvas, pixelRatio: 1 });
+    expect(renderer.getStats?.().programs).toBeNull();
   });
 
   it('dispose releases context, is idempotent, and render is a no-op after dispose', () => {

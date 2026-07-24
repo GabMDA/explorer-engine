@@ -69,6 +69,15 @@
       "action": { "type": "focus", "target": { "kind": "component", "id": "crown" } }
     }
   ],
+  "performance": {
+    "desktop": { "targetFps": 60, "frameBudgetMs": 16.6 },
+    "mobile": { "targetFps": 30, "frameBudgetMs": 33.3 },
+    "overlay": true
+  },
+  "quality": {
+    "adaptive": true,
+    "initialLevel": "high"
+  },
   "requiredCapabilities": [
     { "id": "scenario", "level": "optional" },
     { "id": "measure", "level": "optional" }

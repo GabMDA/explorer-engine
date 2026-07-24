@@ -16,6 +16,9 @@ export type { EnvironmentManagerOptions } from './environment-manager';
 export { createModelLoader } from './model-loader';
 export type { ModelLoaderOptions } from './model-loader';
 
+export { applyInstancing } from './instancing';
+export type { InstancingResult } from './instancing';
+
 export { createNodeIndex } from './node-index';
 export type { NodeIndex } from './node-index';
 

@@ -10,13 +10,23 @@ export type { Engine, EngineOptions, EngineLifecycleState } from './engine';
 export { EventBus } from './events';
 export type { EventHandler, Unsubscribe, EventBusOptions } from './events';
 
-export { createLogger } from './diagnostics';
-export type { Logger, LogLevel, LogEntry, LogSink, LoggerOptions } from './diagnostics';
+export { createLogger, createPerfMetrics } from './diagnostics';
+export type {
+  Logger,
+  LogLevel,
+  LogEntry,
+  LogSink,
+  LoggerOptions,
+  PerfMetrics,
+  PerfMetricsOptions,
+  PerfSnapshot,
+} from './diagnostics';
 
 export type {
   RendererPort,
   RendererConfig,
   RendererSize,
+  RendererStats,
   ColorSpace,
   ToneMapping,
   ScenePort,
@@ -66,6 +76,8 @@ export {
 export type {
   ResourceManager,
   ResourceManagerOptions,
+  ResourceLoadOptions,
+  ResourcePriority,
   ResourceTransport,
   ResourceRequest,
   ResourceData,
@@ -107,6 +119,7 @@ export type { ConfigLoader, ConfigLoaderOptions, LoadedConfig } from './config';
 export type {
   ResolvedConfig,
   ModelConfig,
+  InstancingConfig,
   EnvironmentConfig,
   LightingConfig,
   CameraConfig,
@@ -131,6 +144,10 @@ export type {
   ThemeConfig,
   I18nText,
   I18nConfig,
+  PerformanceBudgetConfig,
+  PerformanceConfig,
+  QualityLeverConfig,
+  QualityConfig,
   ConfigIssue,
   ValidationResult,
 } from '@explorer-engine/schema';
@@ -143,6 +160,9 @@ export {
   DEFAULT_THEME_TOKENS_LIGHT,
   DEFAULT_THEME_TOKENS_DARK,
   DEFAULT_I18N,
+  DEFAULT_PERFORMANCE,
+  DEFAULT_QUALITY,
+  DEFAULT_INSTANCING,
 } from '@explorer-engine/schema';
 
 // Render State Resolver (chapter 19, ADR-001) — the single authority over visual state.
@@ -251,6 +271,10 @@ export type {
   PluginStateFacade,
 } from './plugins';
 
+// Quality Manager (chapter 14 §14.2.2, P9-T2).
+export { createQualityManager, QUALITY_LEVELS } from './quality';
+export type { QualityManager, QualityManagerOptions, QualityLevel } from './quality';
+
 // Selection Manager (P4-T1).
 export { createSelectionManager } from './selection';
 export type {
@@ -300,6 +324,8 @@ export type {
   TourCompletedEvent,
   MeasurePointAddedEvent,
   MeasureCompletedEvent,
+  QualityChangeReason,
+  QualityChangedEvent,
   SelectionChangedEvent,
   SelectionHoverEvent,
   HotspotActivatedEvent,
