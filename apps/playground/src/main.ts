@@ -534,6 +534,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
               x: v.x / width,
               y: v.y / height,
               occluded: v.occluded,
+              active: v.state === 'active',
             })),
         );
       }
@@ -680,6 +681,10 @@ async function boot(app: HTMLDivElement): Promise<void> {
     });
 
   const teardown = async () => {
+    // Removes itself first — otherwise each HMR/reboot cycle would retain the
+    // ENTIRE closure graph of this boot() call via a `beforeunload` listener
+    // that never gets released (roadmap P9-T4, ENGINE_CONSTITUTION L20).
+    window.removeEventListener('beforeunload', teardown);
     loop.dispose();
     if (perfOverlayInterval !== undefined) window.clearInterval(perfOverlayInterval);
     perfOverlay.remove();
@@ -713,6 +718,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
     environment.dispose();
     lighting.dispose();
     scene.dispose();
+    camera.dispose();
     renderer.dispose();
     caption.remove();
     canvas.remove();
@@ -826,6 +832,14 @@ async function boot(app: HTMLDivElement): Promise<void> {
           if ((o as { isMesh?: boolean }).isMesh) count += 1;
         });
         return count;
+      },
+      // Sprint 7 Phase 3 memory-audit hook: tear down and re-boot the WHOLE
+      // engine graph in place (no page reload), so a stress test can repeat
+      // this cycle and watch the JS heap for genuine leaks (P9-T4) rather than
+      // a browser tab reset that would hide them.
+      reboot: async () => {
+        await teardown();
+        await boot(app);
       },
       teardown,
     };
