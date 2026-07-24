@@ -1,16 +1,17 @@
-// Explorer Engine — development playground (Sprint 4: states).
+// Explorer Engine — development playground (Sprint 5: UI Web Components).
 //
 // The playground is a GENERIC composition root: it fetches a config.json through
 // the Config Loader (core), then builds the scene ENTIRELY from that resolved
 // config — lighting, environment, camera, controls, model, AND the interaction +
 // focus/animation + state stack (Render State Resolver, Animation Engine, Selection,
-// Hotspots, Focus Manager, camera intent controller, State Manager). There is no
-// object-specific code: the same code drives any config (proof of L1/L2).
+// Hotspots, Focus Manager, camera intent controller, State Manager) — PLUS the UI
+// overlay (Theme/Accessibility/i18n services + the default UiPort adapter). There
+// is no object-specific code: the same code drives any config (proof of L1/L2).
 //
 //   ?config=minimal      minimal single-cube config (default)
 //   ?config=indexed      multi-node model, exercises the node index (P2-T4)
 //   ?config=interactive  components + hotspots + focus, exercises Sprint 2/3
-//   ?config=states       bases + modifiers (exploded / X-ray / cutaway), Sprint 4
+//   ?config=states       bases + modifiers + UI (theme/i18n/a11y), Sprint 4/5
 import {
   createOrbitControls,
   getLightingPreset,
@@ -26,9 +27,15 @@ import {
   createAnimationEngine,
   createFocusManager,
   createStateManager,
+  createThemeManager,
+  createAccessibilityService,
+  createI18nService,
   EventBus,
+  type Address,
   type EngineEventMap,
   type ResolvedConfig,
+  type ToolbarItemDescriptor,
+  type BreadcrumbSegmentDescriptor,
 } from '@explorer-engine/core';
 import {
   createThreeRenderer,
@@ -46,8 +53,7 @@ import {
 } from '@explorer-engine/renderer-three';
 import { createFetchTransport } from '@explorer-engine/resource-fetch';
 import { createDomInput } from '@explorer-engine/input-dom';
-import { createHotspotOverlay } from './hotspot-overlay';
-import { createStateToolbar } from './state-toolbar';
+import { createDomUiPort, wireSystemPreferences } from '@explorer-engine/ui-webcomponents';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -59,6 +65,16 @@ const CONFIG_PATH = ((): string => {
   return 'minimal.json';
 })();
 
+/** Approximate progress fraction for the loader bar — the emitted `model:loading`
+ * event only carries a discrete phase (chapter 05), not a byte-level fraction. */
+const PHASE_PROGRESS: Record<string, number> = {
+  fetching: 0.2,
+  parsing: 0.45,
+  inserting: 0.7,
+  framing: 0.9,
+  ready: 1,
+};
+
 const app = document.querySelector<HTMLDivElement>('#app');
 
 async function boot(app: HTMLDivElement): Promise<void> {
@@ -66,7 +82,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
   app.appendChild(canvas);
   const caption = document.createElement('p');
   caption.className = 'caption';
-  caption.textContent = 'Explorer Engine — Sprint 3 · loading config…';
+  caption.textContent = 'Explorer Engine — loading config…';
   document.body.appendChild(caption);
 
   const renderer = createThreeRenderer({ canvas, toneMapping: 'aces-filmic' });
@@ -164,15 +180,6 @@ async function boot(app: HTMLDivElement): Promise<void> {
 
   const hotspots = createHotspotManager({ config, components, events });
   const projector = createHotspotProjector({ scene, camera, renderer });
-  const overlay =
-    hotspots.count > 0
-      ? createHotspotOverlay({
-          container: document.body,
-          hotspots: hotspots.view().map((v) => ({ id: v.id, label: v.label })),
-          onActivate: (id) => hotspots.activate(id),
-          onHover: (id) => hotspots.hover(id),
-        })
-      : null;
 
   // State Manager (headless statechart) → publishes state/modifier layers + intents.
   const stateManager = createStateManager({
@@ -181,42 +188,126 @@ async function boot(app: HTMLDivElement): Promise<void> {
     initialState: config.initialState,
     events,
   });
-  const bases = config.states
-    .filter((s) => s.region === 'base')
-    .map((s) => ({ id: s.id, label: s.label }));
-  const mods = config.states
-    .filter((s) => s.region !== 'base')
-    .map((s) => ({ id: s.id, label: s.label }));
-  const toolbar =
-    config.states.length > 0
-      ? createStateToolbar({
-          container: document.body,
-          bases,
-          modifiers: mods,
-          onBase: (id) => {
-            stateManager.goToBase(id);
-            wake();
-          },
-          onModifier: (id) => {
-            stateManager.toggleModifier(id);
-            wake();
-          },
-          onReset: () => {
-            focus.clear();
-            selection.clearSelection();
-            stateManager.reset();
-            wake();
-          },
-        })
-      : null;
-  toolbar?.update(stateManager.getBase(), stateManager.getModifiers());
+
+  // --- UI (Sprint 5, P7): headless Theme/Accessibility/i18n services + the
+  // default UiPort adapter (Web Components, DOM confined to that package). The
+  // adapter only ever sees plain descriptors and reports typed UiAction intents
+  // over the SAME shared bus every other manager already uses — no manager gains
+  // a new dependency, and the core stays entirely headless (L8/L9).
+  const themeManager = createThemeManager({ config: config.theme, events });
+  const unwireSystemPreferences = wireSystemPreferences(themeManager, (q) => window.matchMedia(q));
+
+  const componentLabel = (id: string): string =>
+    config.components.find((c) => c.id === id)?.label ?? id;
+  const labelForAddress = (address: Address): string =>
+    address.kind === 'component' ? componentLabel(address.id) : address.id;
+
+  // The UiPort's bus subscriptions (theme/a11y) must exist BEFORE any other
+  // service publishes, since it only reacts to events — it has no "current state"
+  // getters to pull from (mirrors why `initialTokens` exists for theme below).
+  const uiPort = createDomUiPort({
+    container: document.body,
+    events,
+    initialTokens: themeManager.getTokens(),
+  });
+  uiPort.mountShell({ title: config.meta.title ?? 'Explorer Engine', showBreadcrumb: true });
+
+  const a11y = createAccessibilityService({ events, describeTarget: labelForAddress });
+  a11y.setNavigable(
+    config.components
+      .filter((c) => c.selectable)
+      .map((c) => ({ target: { kind: 'component', id: c.id } as Address, label: c.label ?? c.id })),
+  );
+
+  const i18n = createI18nService({
+    locales: config.i18n.locales,
+    defaultLocale: config.meta.defaultLocale ?? 'en',
+    events,
+  });
+  // The engine's own chrome strings (not package content) — a package's i18n
+  // sources (ch.05 §5.3.15) would flow through the same registerDictionary path.
+  i18n.registerDictionary('en', { 'ui.reset': 'Reset' });
+  i18n.registerDictionary('fr', { 'ui.reset': 'Réinitialiser' });
+
+  const renderBreadcrumb = (): void => {
+    const stack = focus.getStack();
+    const segments: BreadcrumbSegmentDescriptor[] = [
+      { label: 'Home', target: null, current: stack.length === 0 },
+      ...stack.map((address, i) => ({
+        label: labelForAddress(address),
+        target: address,
+        current: i === stack.length - 1,
+      })),
+    ];
+    uiPort.setBreadcrumb(segments);
+  };
+
+  const renderToolbar = (): void => {
+    const base = stateManager.getBase();
+    const modifiers = stateManager.getModifiers();
+    const locales = i18n.getLocales();
+    const items: ToolbarItemDescriptor[] = [
+      ...config.states
+        .filter((s) => s.region === 'base')
+        .map((s) => ({
+          kind: 'stateToggle' as const,
+          id: s.id,
+          label: s.label,
+          active: s.id === base,
+        })),
+      ...config.states
+        .filter((s) => s.region !== 'base')
+        .map((s) => ({
+          kind: 'stateToggle' as const,
+          id: s.id,
+          label: s.label,
+          active: modifiers.includes(s.id),
+        })),
+      { kind: 'resetView', id: 'reset', label: i18n.translate({ $t: 'ui.reset' }) },
+      {
+        kind: 'themeToggle',
+        id: 'theme',
+        label: themeManager.getVariant() === 'dark' ? 'Light' : 'Dark',
+      },
+      ...(locales.length > 1
+        ? locales.map((locale) => ({
+            kind: 'languageSelect' as const,
+            id: locale,
+            label: locale.toUpperCase(),
+            active: locale === i18n.getLocale(),
+          }))
+        : []),
+      { kind: 'fullscreen', id: 'fullscreen', label: 'Fullscreen' },
+    ];
+    uiPort.setToolbar(items);
+  };
+
+  const showPanelFor = (address: Address): void => {
+    uiPort.showPanel({
+      id: address.id,
+      title: labelForAddress(address),
+      blocks: [{ type: 'text', text: `${address.kind} · ${address.id}` }],
+    });
+  };
+
+  renderBreadcrumb();
+  renderToolbar();
 
   // React to interaction events (typed bus). A hotspot `focus` action now drives
   // the Focus Manager (camera transition + dim/outline); `emit` is just reported.
   events.on('selection:changed', (e) => (caption.textContent = `Selected: ${e.component}`));
-  events.on('focus:started', (e) => (caption.textContent = `Focus → ${e.target.id} · Esc = back`));
+  events.on('focus:started', (e) => {
+    caption.textContent = `Focus → ${e.target.id} · Esc = back`;
+    renderBreadcrumb();
+    showPanelFor(e.target);
+    wake();
+  });
   events.on('focus:ended', (e) => {
     caption.textContent = e.current ? `Focus → ${e.current.id} · Esc = back` : `Overview`;
+    renderBreadcrumb();
+    uiPort.hidePanel(e.target.id);
+    if (e.current) showPanelFor(e.current);
+    wake();
   });
   events.on('hotspot:activated', (e) => {
     if (e.action.type === 'focus') focus.focus(e.action.target);
@@ -224,12 +315,79 @@ async function boot(app: HTMLDivElement): Promise<void> {
     else caption.textContent = `Hotspot ${e.id} → ${e.action.type}`;
     wake();
   });
-  // Keep the toolbar in sync with the macroscopic state.
+  // Keep the toolbar/breadcrumb in sync with the macroscopic state / theme / locale.
   events.on('state:changed', (e) => {
-    toolbar?.update(e.base, e.modifiers);
+    renderToolbar();
     caption.textContent = `State: ${e.base ?? 'rest'}${e.modifiers.length ? ' + ' + e.modifiers.join(', ') : ''}`;
     wake();
   });
+  events.on('theme:changed', () => renderToolbar());
+  events.on('i18n:locale-changed', () => renderToolbar());
+  events.on('model:loading', (e) => {
+    uiPort.setLoader({
+      visible: true,
+      progress: PHASE_PROGRESS[e.phase],
+      message: `Loading… (${e.phase})`,
+    });
+  });
+  events.on('model:loaded', () => uiPort.setLoader({ visible: false }));
+  events.on('model:error', (e) => {
+    caption.textContent = `Explorer Engine — model error: ${e.message}`;
+    uiPort.setLoader({ visible: false });
+  });
+
+  // Turns UI-raised intents into calls on the headless managers (ch.12 §12.10) —
+  // the adapter itself never reaches into the engine directly.
+  uiPort.onAction((action) => {
+    switch (action.type) {
+      case 'goToState': {
+        const definition = config.states.find((s) => s.id === action.state);
+        // A modifier toolbar item must TOGGLE (goToState always turns a modifier
+        // ON) — the descriptor doesn't carry region info, so resolve it here.
+        if (definition && definition.region !== 'base') stateManager.toggleModifier(action.state);
+        else stateManager.goToState(action.state);
+        wake();
+        break;
+      }
+      case 'toggleModifier':
+        stateManager.toggleModifier(action.id);
+        wake();
+        break;
+      case 'reset':
+        focus.clear();
+        selection.clearSelection();
+        stateManager.reset();
+        wake();
+        break;
+      case 'back':
+        if (focus.depth > 0) {
+          focus.back();
+          wake();
+        }
+        break;
+      case 'focus':
+        focus.focus(action.target);
+        wake();
+        break;
+      case 'setThemePreset':
+        themeManager.setPreset(action.preset);
+        break;
+      case 'setLocale':
+        i18n.setLocale(action.locale);
+        break;
+      case 'custom':
+        if (action.id === 'hotspot' && action.payload && typeof action.payload === 'object') {
+          const hotspotId = (action.payload as { hotspotId?: unknown }).hotspotId;
+          if (typeof hotspotId === 'string') hotspots.activate(hotspotId);
+          wake();
+        }
+        break;
+    }
+  });
+
+  // Plugin slot demonstration (P8 lands the real plugin system later; this only
+  // proves the descriptor-based slot mechanism end to end).
+  uiPort.registerSlot('status');
 
   // On-demand render loop (P1-T5): advance animations, compose visual state, project
   // hotspots, draw. The loop stays alive while an animation is active, then goes
@@ -244,9 +402,21 @@ async function boot(app: HTMLDivElement): Promise<void> {
       engine.update(performance.now()); // advance tweens/timelines (camera + RSR fades)
       const moving = controls.update();
       resolver.flush(); // push composed visual state to the applicator (dirty only)
-      if (overlay) {
+      if (hotspots.count > 0) {
         hotspots.applyProjection(projector.project(hotspots.anchors()));
-        overlay.update(hotspots.view());
+        const { width, height } = renderer.getSize();
+        uiPort.positionMarkers(
+          hotspots
+            .view()
+            .filter((v) => v.visible)
+            .map((v) => ({
+              id: v.id,
+              label: v.label,
+              x: v.x / width,
+              y: v.y / height,
+              occluded: v.occluded,
+            })),
+        );
       }
       renderer.render(scene, camera);
       if (moving || engine.hasActive) loop.requestRender();
@@ -308,9 +478,6 @@ async function boot(app: HTMLDivElement): Promise<void> {
   canvas.focus();
 
   // 4. Model loader configured from the config (decoders gated by config toggles).
-  events.on('model:error', (e) => {
-    caption.textContent = `Explorer Engine — Sprint 2 · model error: ${e.message}`;
-  });
   const modelLoader = createModelLoader({
     resourceManager,
     scene,
@@ -333,6 +500,10 @@ async function boot(app: HTMLDivElement): Promise<void> {
       const view = controls.getView();
       cam.controller?.setHome(view.position, view.target);
       caption.textContent = `Explorer Engine — ${config.meta.title ?? 'model'} · ${n} node(s) · ${hs} hotspot(s) · hotspot = focus, Esc = back`;
+      uiPort.renderSlot('status', {
+        type: 'div',
+        props: { class: 'ee-status-slot', text: `${n} node(s) loaded` },
+      });
       wake();
     })
     .catch((error: unknown) => {
@@ -349,8 +520,11 @@ async function boot(app: HTMLDivElement): Promise<void> {
     input.dispose();
     controls.dispose();
     modelLoader.dispose();
-    overlay?.dispose();
-    toolbar?.dispose();
+    unwireSystemPreferences();
+    uiPort.dispose();
+    themeManager.dispose();
+    a11y.dispose();
+    i18n.dispose();
     stateManager.dispose();
     focus.dispose();
     cam.controller?.dispose();
@@ -372,6 +546,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
   if (import.meta.hot) import.meta.hot.dispose(teardown);
 
   if (import.meta.env.DEV) {
+    const shellShadow = () => document.querySelector('ee-ui-shell')?.shadowRoot ?? null;
     (window as unknown as { __ee?: unknown }).__ee = {
       cameraPosition: () => camera.getThreeCamera().position.toArray(),
       renderCount: () => renderCount,
@@ -386,8 +561,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
       // Sprint 2 interaction hooks.
       hotspotCount: () => hotspots.count,
       hotspotView: () => hotspots.view(),
-      listItemCount: () => document.querySelectorAll('.ee-hotspot-listitem').length,
-      markerCount: () => document.querySelectorAll('.ee-hotspot').length,
+      markerCount: () => shellShadow()?.querySelectorAll('.ee-marker').length ?? 0,
       selectComponent: (id: string | null) => selection.selectComponent(id),
       hoverComponent: (id: string | null) => selection.hoverComponent(id),
       pickAt: (nx: number, ny: number) => {
@@ -420,7 +594,34 @@ async function boot(app: HTMLDivElement): Promise<void> {
       serializeState: () => stateManager.serialize(),
       applyState: (snap: { base: string | null; modifiers: readonly string[] }) =>
         stateManager.apply(snap),
-      toolbarButtons: () => document.querySelectorAll('.ee-toolbar-item').length,
+      toolbarButtonLabels: () =>
+        Array.from(shellShadow()?.querySelectorAll('.ee-toolbar-item') ?? []).map(
+          (b) => b.textContent,
+        ),
+      // Sprint 5 UI hooks.
+      uiPort: () => uiPort,
+      themeVariant: () => themeManager.getVariant(),
+      setThemePreset: (preset: 'light' | 'dark' | 'auto') => themeManager.setPreset(preset),
+      locale: () => i18n.getLocale(),
+      setLocale: (locale: string) => i18n.setLocale(locale),
+      announce: (message: string) => a11y.announce(message),
+      livePoliteText: () => shellShadow()?.querySelector('.ee-live-polite')?.textContent ?? null,
+      breadcrumbLabels: () =>
+        Array.from(shellShadow()?.querySelectorAll('.ee-breadcrumb button') ?? []).map(
+          (b) => b.textContent,
+        ),
+      panelIds: () =>
+        Array.from(shellShadow()?.querySelectorAll('.ee-panel') ?? []).map((p) =>
+          p.getAttribute('aria-label'),
+        ),
+      loaderVisible: () =>
+        shellShadow()?.querySelector('.ee-loader')?.hasAttribute('hidden') === false,
+      navlistEntries: () =>
+        Array.from(shellShadow()?.querySelectorAll('.ee-navlist li button') ?? []).map(
+          (b) => b.textContent,
+        ),
+      statusSlotText: () =>
+        shellShadow()?.querySelector('[data-slot="status"]')?.textContent ?? null,
       teardown,
     };
   }

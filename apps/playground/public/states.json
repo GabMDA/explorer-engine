@@ -1,6 +1,7 @@
 {
   "schemaVersion": "1.0",
   "meta": { "title": "States Demo", "defaultLocale": "en" },
+  "i18n": { "locales": ["en", "fr"] },
   "model": { "src": "models/indexed.glb" },
   "camera": { "controls": { "minDistance": 1, "maxDistance": 20 } },
   "components": [
