@@ -8,6 +8,7 @@ import type {
   RendererPort,
   RendererConfig,
   RendererSize,
+  RendererStats,
   ColorSpace,
   ToneMapping,
   ScenePort,
@@ -92,6 +93,16 @@ export function createThreeRenderer(
         );
       }
       renderer.render(sceneHandle.getThreeScene(), cameraHandle.getThreeCamera());
+    },
+    getStats(): RendererStats {
+      const info = renderer.info;
+      return {
+        drawCalls: info.render.calls,
+        triangles: info.render.triangles,
+        geometries: info.memory.geometries,
+        textures: info.memory.textures,
+        programs: info.programs?.length ?? null,
+      };
     },
     dispose() {
       if (disposed) return;
