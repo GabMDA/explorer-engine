@@ -1,5 +1,10 @@
 export { createResourceManager, ResourceCancelledError } from './resource-manager';
-export type { ResourceManager, ResourceManagerOptions } from './resource-manager';
+export type {
+  ResourceManager,
+  ResourceManagerOptions,
+  ResourceLoadOptions,
+  ResourcePriority,
+} from './resource-manager';
 export type {
   ResourceTransport,
   ResourceRequest,

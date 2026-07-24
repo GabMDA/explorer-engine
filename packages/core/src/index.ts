@@ -76,6 +76,8 @@ export {
 export type {
   ResourceManager,
   ResourceManagerOptions,
+  ResourceLoadOptions,
+  ResourcePriority,
   ResourceTransport,
   ResourceRequest,
   ResourceData,
@@ -117,6 +119,7 @@ export type { ConfigLoader, ConfigLoaderOptions, LoadedConfig } from './config';
 export type {
   ResolvedConfig,
   ModelConfig,
+  InstancingConfig,
   EnvironmentConfig,
   LightingConfig,
   CameraConfig,
@@ -159,6 +162,7 @@ export {
   DEFAULT_I18N,
   DEFAULT_PERFORMANCE,
   DEFAULT_QUALITY,
+  DEFAULT_INSTANCING,
 } from '@explorer-engine/schema';
 
 // Render State Resolver (chapter 19, ADR-001) — the single authority over visual state.
