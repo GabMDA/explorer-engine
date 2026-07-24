@@ -117,6 +117,38 @@ export interface I18nLocaleChangedEvent {
   readonly locale: string;
 }
 
+/** A plugin lifecycle hook completed successfully (ch.10 §10.4). */
+export interface PluginRegisteredEvent {
+  readonly id: string;
+}
+
+/** A plugin finished `start` and is now active (ch.10 §10.4). */
+export interface PluginStartedEvent {
+  readonly id: string;
+}
+
+/** A plugin finished `stop`. */
+export interface PluginStoppedEvent {
+  readonly id: string;
+}
+
+/** A plugin finished `dispose` and was released. */
+export interface PluginDisposedEvent {
+  readonly id: string;
+}
+
+/** Where a plugin failed: a lifecycle hook, or the pre-hook resolution pass
+ * (missing capability, incompatibility, `orderAfter` cycle — ch.10 §10.5.2). */
+export type PluginErrorPhase = 'resolve' | 'register' | 'init' | 'start' | 'stop' | 'dispose';
+
+/** A plugin failed and was isolated (L17) — it never breaks the engine or its
+ * siblings. Always logged (L24); never a silent failure. */
+export interface PluginErrorEvent {
+  readonly id: string;
+  readonly phase: PluginErrorPhase;
+  readonly message: string;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -137,4 +169,9 @@ export interface EngineEventMap {
   'a11y:navigable-changed': A11yNavigableChangedEvent;
   'i18n:locale-changed': I18nLocaleChangedEvent;
   'ui:action': UiAction;
+  'plugin:registered': PluginRegisteredEvent;
+  'plugin:started': PluginStartedEvent;
+  'plugin:stopped': PluginStoppedEvent;
+  'plugin:disposed': PluginDisposedEvent;
+  'plugin:error': PluginErrorEvent;
 }
