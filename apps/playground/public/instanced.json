@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "meta": { "title": "Instancing Demo", "defaultLocale": "en" },
+  "model": {
+    "src": "models/instanced.glb",
+    "instancing": { "enabled": true, "minCount": 3 }
+  },
+  "components": [{ "id": "hub", "label": "Hub", "nodes": [{ "explorerId": "hub" }] }],
+  "performance": { "overlay": true }
+}

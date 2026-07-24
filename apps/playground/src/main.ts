@@ -14,6 +14,7 @@
 //   ?config=indexed      multi-node model, exercises the node index (P2-T4)
 //   ?config=interactive  components + hotspots + focus, exercises Sprint 2/3
 //   ?config=states       bases + modifiers + UI + plugins, Sprint 4/5/6
+//   ?config=instanced    repeated geometry, exercises automatic instancing (P9-T1)
 import {
   createOrbitControls,
   getLightingPreset,
@@ -72,6 +73,7 @@ const CONFIG_PATH = ((): string => {
   if (which === 'indexed') return 'indexed.json';
   if (which === 'states') return 'states.json';
   if (which === 'interactive') return 'interactive.json';
+  if (which === 'instanced') return 'instanced.json';
   return 'minimal.json';
 })();
 
@@ -645,6 +647,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
     controls,
     events,
     requestRender: wake,
+    instancing: config.model.instancing,
     ...(config.model.draco ? { dracoDecoderPath: 'decoders/draco/' } : {}),
     ...(config.model.ktx2 ? { ktx2TranscoderPath: 'decoders/basis/', renderer } : {}),
   });
@@ -803,12 +806,27 @@ async function boot(app: HTMLDivElement): Promise<void> {
         shellShadow()?.querySelector('[data-slot="guided-tour-status"]')?.textContent ?? null,
       measureOverlayText: () =>
         shellShadow()?.querySelector('[data-slot="measure-overlay"]')?.textContent ?? null,
-      // Sprint 7 diagnostics / quality hooks.
+      // Sprint 7 Phase 1 diagnostics / quality hooks.
       perfMetrics: () => perf,
       qualityManager: () => quality,
       perfSnapshot: () => perf.snapshot(),
       perfOverlayEnabled: () => perfOverlayEnabled,
       perfOverlayText: () => (perfOverlayEnabled ? perfOverlay.textContent : null),
+      // Sprint 7 Phase 2 instancing hook.
+      instancedMeshCount: () => {
+        let count = 0;
+        scene.getThreeScene().traverse((o) => {
+          if ((o as { isInstancedMesh?: boolean }).isInstancedMesh) count += 1;
+        });
+        return count;
+      },
+      meshCount: () => {
+        let count = 0;
+        scene.getThreeScene().traverse((o) => {
+          if ((o as { isMesh?: boolean }).isMesh) count += 1;
+        });
+        return count;
+      },
       teardown,
     };
   }
