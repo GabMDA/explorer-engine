@@ -68,5 +68,13 @@
       "anchor": { "kind": "component", "id": "crown" },
       "action": { "type": "focus", "target": { "kind": "component", "id": "crown" } }
     }
+  ],
+  "requiredCapabilities": [
+    { "id": "scenario", "level": "optional" },
+    { "id": "measure", "level": "optional" }
+  ],
+  "plugins": [
+    { "id": "guided-tour", "options": { "steps": ["crown", "gears"], "loop": false } },
+    { "id": "measure", "options": {} }
   ]
 }
