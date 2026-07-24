@@ -6,6 +6,7 @@ import type {
   Address,
   BackgroundConfig,
   CameraConfig,
+  Capability,
   ClipPlaneConfig,
   ComponentConfig,
   ConfigIssue,
@@ -23,6 +24,7 @@ import type {
   MetaConfig,
   ModelConfig,
   NodeRef,
+  PluginEntry,
   ResolvedConfig,
   StateCameraIntentConfig,
   StateConfig,
@@ -65,7 +67,10 @@ const KNOWN_KEYS = new Set([
   'initialState',
   'theme',
   'i18n',
+  'requiredCapabilities',
+  'plugins',
 ]);
+const CAPABILITY_LEVELS = ['required', 'optional'] as const;
 const THEME_PRESETS: readonly ThemePreset[] = ['light', 'dark', 'auto'];
 const LIGHTING_PRESETS: readonly LightingPresetId[] = ['studio', 'outdoor', 'night'];
 const ENV_SOURCES: readonly EnvironmentSourceId[] = ['none', 'neutral-room'];
@@ -829,6 +834,72 @@ function validateI18n(ctx: Ctx, raw: unknown, defaultLocale: string): I18nConfig
   return { locales, sources };
 }
 
+function validateRequiredCapabilities(ctx: Ctx, raw: unknown): Capability[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    ctx.error('requiredCapabilities', 'must be an array');
+    return [];
+  }
+  const out: Capability[] = [];
+  const seen = new Set<string>();
+  raw.forEach((item, i) => {
+    const base = `requiredCapabilities[${i}]`;
+    if (!isObject(item)) {
+      ctx.error(base, 'must be an object { id, level? }');
+      return;
+    }
+    if (!isString(item['id']) || item['id'].length === 0) {
+      ctx.error(`${base}.id`, 'is required and must be a non-empty string');
+      return;
+    }
+    const id = item['id'];
+    if (seen.has(id)) ctx.warn(`${base}.id`, `duplicate capability id "${id}"`);
+    seen.add(id);
+    let level: Capability['level'] = 'required';
+    if (item['level'] !== undefined) {
+      if (CAPABILITY_LEVELS.includes(item['level'] as Capability['level'])) {
+        level = item['level'] as Capability['level'];
+      } else {
+        ctx.error(`${base}.level`, `must be one of ${CAPABILITY_LEVELS.join(' | ')}`);
+      }
+    }
+    out.push({ id, level });
+  });
+  return out;
+}
+
+function validatePlugins(ctx: Ctx, raw: unknown): PluginEntry[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    ctx.error('plugins', 'must be an array');
+    return [];
+  }
+  const out: PluginEntry[] = [];
+  const seen = new Set<string>();
+  raw.forEach((item, i) => {
+    const base = `plugins[${i}]`;
+    if (!isObject(item)) {
+      ctx.error(base, 'must be an object { id, enabled?, options? }');
+      return;
+    }
+    if (!isString(item['id']) || item['id'].length === 0) {
+      ctx.error(`${base}.id`, 'is required and must be a non-empty string');
+      return;
+    }
+    const id = item['id'];
+    if (seen.has(id)) ctx.error(`${base}.id`, `duplicate plugin id "${id}"`);
+    seen.add(id);
+    const enabled = ctx.bool(item['enabled'], `${base}.enabled`, true);
+    let options: Readonly<Record<string, unknown>> = {};
+    if (item['options'] !== undefined) {
+      if (isObject(item['options'])) options = item['options'];
+      else ctx.error(`${base}.options`, 'must be an object');
+    }
+    out.push({ id, enabled, options });
+  });
+  return out;
+}
+
 function validateReferences(
   ctx: Ctx,
   components: readonly ComponentConfig[],
@@ -949,6 +1020,8 @@ export function validateConfig(raw: unknown): ValidationResult {
     initialState,
     theme: validateTheme(ctx, raw['theme']),
     i18n: validateI18n(ctx, raw['i18n'], meta.defaultLocale ?? 'en'),
+    requiredCapabilities: validateRequiredCapabilities(ctx, raw['requiredCapabilities']),
+    plugins: validatePlugins(ctx, raw['plugins']),
   };
 
   if (ctx.errors.length > 0) return { ok: false, errors: ctx.errors, warnings: ctx.warnings };

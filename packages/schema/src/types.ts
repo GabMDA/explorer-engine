@@ -269,6 +269,32 @@ export interface I18nConfig {
   readonly sources: Readonly<Record<string, string>>;
 }
 
+// --- Plugins (chapter 05 §5.3.1bis/§5.3.14, chapter 10, ADR-006) ----------------
+
+/**
+ * A capability a package expects from the runtime (ch.05 §5.3.1bis, C8). A
+ * missing `required` capability disables the dependent feature (with a
+ * diagnostic, never a global failure); a missing `optional` one is ignored.
+ * Capabilities name a runtime-provided ABILITY (e.g. `"scenario"`, `"measure"`),
+ * never a concrete plugin id — this is what keeps a package portable across any
+ * runtime that satisfies its declared capability profile.
+ */
+export interface Capability {
+  readonly id: string;
+  readonly level: 'required' | 'optional';
+}
+
+/**
+ * A package's activation/configuration of a plugin already REGISTERED by the
+ * runtime (ch.05 §5.3.14, ch.10 §10.5.1). A package never supplies plugin code —
+ * only its id and options.
+ */
+export interface PluginEntry {
+  readonly id: string;
+  readonly enabled: boolean;
+  readonly options: Readonly<Record<string, unknown>>;
+}
+
 /**
  * A fully-defaulted, validated configuration. This is what the Config Loader
  * produces (immutable). Every optional input field has been resolved to a value.
@@ -288,6 +314,8 @@ export interface ResolvedConfig {
   readonly initialState: string | null;
   readonly theme: ThemeConfig;
   readonly i18n: I18nConfig;
+  readonly requiredCapabilities: readonly Capability[];
+  readonly plugins: readonly PluginEntry[];
 }
 
 /** A single validation problem, addressed by a JSON-ish path. */
