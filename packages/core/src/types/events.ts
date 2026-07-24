@@ -6,7 +6,7 @@
 import type { BoundingBox } from '../ports/scene-port';
 import type { ModelLoadPhase } from '../model/model-loader-port';
 import type { UiAction } from '../ports/ui-port';
-import type { Address, HotspotAction } from '@explorer-engine/schema';
+import type { Address, HotspotAction, ThemeTokens } from '@explorer-engine/schema';
 
 export interface EngineDisposedEvent {
   /** Epoch milliseconds at which disposal occurred. */
@@ -81,6 +81,16 @@ export interface ModifierChangedEvent {
   readonly on: boolean;
 }
 
+/** `'light' | 'dark'` — the resolved theme variant (ch.13 §13.4). Defined here
+ * (rather than in the Theme Manager) to keep the event catalog a leaf module. */
+export type ThemeVariant = 'light' | 'dark';
+
+/** The resolved theme changed (preset switch or system preference change). */
+export interface ThemeChangedEvent {
+  readonly variant: ThemeVariant;
+  readonly tokens: ThemeTokens;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -96,5 +106,6 @@ export interface EngineEventMap {
   'state:changing': StateChangingEvent;
   'state:changed': StateChangedEvent;
   'modifier:changed': ModifierChangedEvent;
+  'theme:changed': ThemeChangedEvent;
   'ui:action': UiAction;
 }

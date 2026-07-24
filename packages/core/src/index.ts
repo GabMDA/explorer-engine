@@ -222,6 +222,15 @@ export type {
 export { createStateManager } from './state';
 export type { StateManager, StateManagerOptions, SerializedState } from './state';
 
+// Theme Manager (chapter 13, P7-T1).
+export { createThemeManager } from './theme';
+export type {
+  ThemeManager,
+  ThemeManagerOptions,
+  ThemeVariant,
+  SystemThemePreferences,
+} from './theme';
+
 // Selection Manager (P4-T1).
 export { createSelectionManager } from './selection';
 export type {
@@ -255,6 +264,7 @@ export type {
   StateChangingEvent,
   StateChangedEvent,
   ModifierChangedEvent,
+  ThemeChangedEvent,
   SelectionChangedEvent,
   SelectionHoverEvent,
   HotspotActivatedEvent,
