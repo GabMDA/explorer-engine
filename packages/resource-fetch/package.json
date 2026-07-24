@@ -1,6 +1,6 @@
 {
   "name": "@explorer-engine/resource-fetch",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "ResourceTransport adapter — the ONLY resource package allowed to use fetch/AbortController. Performs the HTTP request, converts the response to bytes, returns URL + MIME, maps cancellation onto AbortController. No GLB/textures/audio/ObjectURL.",
   "license": "UNLICENSED",
@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explorer-engine/core": "0.0.0"
+    "@explorer-engine/core": "1.0.0"
   }
 }

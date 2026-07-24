@@ -1,6 +1,6 @@
 # Explorer Engine — Documentation d'Architecture
 
-> **Statut** : Spécification de conception (v0.1 — *design freeze en cours*)
+> **Statut** : Spécification **v1.0 — Design Freeze** (voir [ADR-008](./adr/ADR-008-design-freeze-v1.md) et le [CHANGELOG](../CHANGELOG.md)). Amendements désormais tracés (§5 ci-dessous), plus de révision libre.
 > **Nature du document** : Source de vérité (Single Source of Truth) du projet Explorer Engine.
 > **Règle d'or** : Toute décision de développement future DOIT être conforme à cette spécification. En cas de contradiction entre le code et ce document, c'est le document qui fait foi jusqu'à amendement explicite.
 
@@ -56,6 +56,8 @@ Cette documentation est organisée en **chapitres numérotés**. Chaque chapitre
 | 18 | [Évolutions futures](./18-evolutions-futures.md) | Explorer Studio, IA, VR, multijoueur… | Direction, architectes |
 | 19 | [Render State Resolver](./19-render-state-resolver.md) | État de rendu déclaratif à couches (noyau, **spec v2**) | Architectes, développeurs |
 | 20 | [État runtime sérialisable](./20-runtime-state-serialization.md) | Deep-linking, historique, partage d'URL (noyau, **spec v2**) | Architectes, développeurs |
+| 21 | [Guide créateur : produire un Explorer Package](./21-guide-createur-package.md) | Guide pratique, pas à pas, sur les deux packages de référence réels (P10-T3) | Créateurs de contenu |
+| 22 | [Guide plugin : développer une extension](./22-guide-plugins.md) | Guide pratique, sur le code réel des deux plugins officiels (P10-T3) | Développeurs, intégrateurs |
 | — | [Glossaire](./99-glossaire.md) | Terminologie de référence | Tous |
 | — | [Revue v1](./reviews/architecture-review-v1.md) · [Change-log v2](./reviews/spec-v2-change-log.md) | Revue d'architecture & suivi des corrections | Architectes |
 
@@ -64,11 +66,12 @@ Cette documentation est organisée en **chapitres numérotés**. Chaque chapitre
 | Document | Objet |
 |----------|-------|
 | [ENGINE_CONSTITUTION.md](../ENGINE_CONSTITUTION.md) | Les invariants absolus (lois L1–L29) — priment sur toute PR. |
-| [Architecture Decision Records](./adr/README.md) | Le *pourquoi* des décisions majeures (ADR-001 → 007). |
+| [Architecture Decision Records](./adr/README.md) | Le *pourquoi* des décisions majeures (ADR-001 → 008). |
 | [DEVELOPMENT_WORKFLOW.md](./DEVELOPMENT_WORKFLOW.md) | Branche → dev → tests → revue → merge → doc. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Guide contributeur (style, plugin, package, commits, PR). |
 | [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md) | Quand une tâche est *terminée*. |
 | [CODE_REVIEW_CHECKLIST.md](./CODE_REVIEW_CHECKLIST.md) | Checklist avant chaque Pull Request. |
+| [CHANGELOG.md](../CHANGELOG.md) | Historique des versions publiées (SemVer). |
 
 > **Spec v2** : chapitres 19–20 ajoutés et chapitres 02, 03, 04, 05–16, 18 amendés après revue d'architecture. Détail dans le [change-log v2](./reviews/spec-v2-change-log.md).
 

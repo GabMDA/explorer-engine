@@ -1,6 +1,6 @@
 {
   "name": "@explorer-engine/plugin-sdk",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Stable, framework-agnostic API for authoring plugins (a pure re-export façade over @explorer-engine/core's plugin contract — no business logic). The ONLY dependency a plugin may take.",
   "license": "UNLICENSED",
@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explorer-engine/core": "0.0.0"
+    "@explorer-engine/core": "1.0.0"
   }
 }

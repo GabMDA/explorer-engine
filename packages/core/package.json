@@ -1,6 +1,6 @@
 {
   "name": "@explorer-engine/core",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Headless core (no DOM, no WebGL): P0-T4 skeleton — engine create/dispose lifecycle, typed event bus, diagnostics logger. Orchestration, ports, render-state resolver, states, focus, selection, animation and config arrive in later phases.",
   "license": "UNLICENSED",
@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explorer-engine/schema": "0.0.0"
+    "@explorer-engine/schema": "1.0.0"
   }
 }

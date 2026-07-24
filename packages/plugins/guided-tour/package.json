@@ -1,6 +1,6 @@
 {
   "name": "@explorer-engine/plugin-guided-tour",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Official reference plugin (ch.10 §10.7.1): sequences a guided tour across focus targets via focus/panels/states, entirely through @explorer-engine/plugin-sdk.",
   "license": "UNLICENSED",
@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explorer-engine/plugin-sdk": "0.0.0"
+    "@explorer-engine/plugin-sdk": "1.0.0"
   }
 }

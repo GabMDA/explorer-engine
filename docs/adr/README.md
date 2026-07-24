@@ -30,6 +30,7 @@ Format : voir [ADR-000 (template)](./ADR-000-template.md).
 | [ADR-005](./ADR-005-explorer-packages.md) | Explorer Packages (moteur ≠ contenu) | Accepted | P1 | 04, 05 |
 | [ADR-006](./ADR-006-plugin-system.md) | Système de plugins | Accepted | P4, C8 | 10 |
 | [ADR-007](./ADR-007-runtime-state-serialization.md) | Sérialisation de l'état runtime | Accepted | C10 | 20 |
+| [ADR-008](./ADR-008-design-freeze-v1.md) | Design Freeze v1.0 (périmètre, versions, compatibilité) | Accepted | — | 03, 04, 05, 10, 16, 21, 22 |
 
 ## Décisions futures à tracer (non encore des ADR)
 

@@ -1,6 +1,6 @@
 {
   "name": "@explorer-engine/schema",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Normative, versioned config.json schema + validator + defaults + migration (chapter 05). Headless, data-only, zero runtime dependency.",
   "license": "UNLICENSED",

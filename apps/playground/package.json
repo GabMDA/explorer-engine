@@ -14,13 +14,13 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explorer-engine/core": "0.0.0",
-    "@explorer-engine/input-dom": "0.0.0",
-    "@explorer-engine/plugin-guided-tour": "0.0.0",
-    "@explorer-engine/plugin-measure": "0.0.0",
-    "@explorer-engine/renderer-three": "0.0.0",
-    "@explorer-engine/resource-fetch": "0.0.0",
-    "@explorer-engine/ui-webcomponents": "0.0.0"
+    "@explorer-engine/core": "1.0.0",
+    "@explorer-engine/input-dom": "1.0.0",
+    "@explorer-engine/plugin-guided-tour": "1.0.0",
+    "@explorer-engine/plugin-measure": "1.0.0",
+    "@explorer-engine/renderer-three": "1.0.0",
+    "@explorer-engine/resource-fetch": "1.0.0",
+    "@explorer-engine/ui-webcomponents": "1.0.0"
   },
   "devDependencies": {
     "vite": "8.1.5"
