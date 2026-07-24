@@ -260,8 +260,31 @@ async function boot(app: HTMLDivElement): Promise<void> {
   const themeManager = createThemeManager({ config: config.theme, events });
   const unwireSystemPreferences = wireSystemPreferences(themeManager, (q) => window.matchMedia(q));
 
+  const i18n = createI18nService({
+    locales: config.i18n.locales,
+    defaultLocale: config.meta.defaultLocale ?? 'en',
+    events,
+  });
+  // The engine's own chrome strings (not package content).
+  i18n.registerDictionary('en', { 'ui.reset': 'Reset' });
+  i18n.registerDictionary('fr', { 'ui.reset': 'Réinitialiser' });
+  // A package's own translations (ch.05 §5.3.15): lazy-fetched through the SAME
+  // headless Resource Manager already used for the config/model, one file per
+  // declared locale, merged additively on top of the engine chrome strings above.
+  await Promise.all(
+    Object.entries(config.i18n.sources).map(async ([locale, path]) => {
+      try {
+        const resource = await resourceManager.load(path);
+        const dict = JSON.parse(new TextDecoder().decode(resource.bytes)) as Record<string, string>;
+        i18n.registerDictionary(locale, dict);
+      } catch (err) {
+        console.warn(`[i18n] failed to load "${path}" for locale "${locale}":`, err);
+      }
+    }),
+  );
+
   const componentLabel = (id: string): string =>
-    config.components.find((c) => c.id === id)?.label ?? id;
+    i18n.translate(config.components.find((c) => c.id === id)?.label ?? id);
   const labelForAddress = (address: Address): string =>
     address.kind === 'component' ? componentLabel(address.id) : address.id;
 
@@ -279,18 +302,11 @@ async function boot(app: HTMLDivElement): Promise<void> {
   a11y.setNavigable(
     config.components
       .filter((c) => c.selectable)
-      .map((c) => ({ target: { kind: 'component', id: c.id } as Address, label: c.label ?? c.id })),
+      .map((c) => ({
+        target: { kind: 'component', id: c.id } as Address,
+        label: i18n.translate(c.label ?? c.id),
+      })),
   );
-
-  const i18n = createI18nService({
-    locales: config.i18n.locales,
-    defaultLocale: config.meta.defaultLocale ?? 'en',
-    events,
-  });
-  // The engine's own chrome strings (not package content) — a package's i18n
-  // sources (ch.05 §5.3.15) would flow through the same registerDictionary path.
-  i18n.registerDictionary('en', { 'ui.reset': 'Reset' });
-  i18n.registerDictionary('fr', { 'ui.reset': 'Réinitialiser' });
 
   // --- Plugins (Sprint 6, P8): headless Plugin Manager + the two official
   // reference plugins, registered PROGRAMMATICALLY (ch.10 §10.5.1 — the HOST
@@ -360,7 +376,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
         .map((s) => ({
           kind: 'stateToggle' as const,
           id: s.id,
-          label: s.label,
+          label: i18n.translate(s.label),
           active: s.id === base,
         })),
       ...config.states
@@ -368,7 +384,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
         .map((s) => ({
           kind: 'stateToggle' as const,
           id: s.id,
-          label: s.label,
+          label: i18n.translate(s.label),
           active: modifiers.includes(s.id),
         })),
       { kind: 'resetView', id: 'reset', label: i18n.translate({ $t: 'ui.reset' }) },
@@ -424,6 +440,10 @@ async function boot(app: HTMLDivElement): Promise<void> {
 
   renderBreadcrumb();
   renderToolbar();
+  // `state:changed` already fired during the State Manager's construction above
+  // (before this file had a listener attached), so the initial `visibleInStates`
+  // gating needs one explicit sync here — subsequent changes are caught below.
+  hotspots.setActiveState(stateManager.getBase());
 
   // React to interaction events (typed bus). A hotspot `focus` action now drives
   // the Focus Manager (camera transition + dim/outline); `emit` is just reported.
@@ -449,12 +469,18 @@ async function boot(app: HTMLDivElement): Promise<void> {
   });
   // Keep the toolbar/breadcrumb in sync with the macroscopic state / theme / locale.
   events.on('state:changed', (e) => {
+    hotspots.setActiveState(e.base);
     renderToolbar();
     caption.textContent = `State: ${e.base ?? 'rest'}${e.modifiers.length ? ' + ' + e.modifiers.join(', ') : ''}`;
     wake();
   });
   events.on('theme:changed', () => renderToolbar());
-  events.on('i18n:locale-changed', () => renderToolbar());
+  // Hotspot marker labels are translate()'d inside the render loop (below), so a
+  // locale switch needs a frame to actually repaint them, not just the toolbar.
+  events.on('i18n:locale-changed', () => {
+    renderToolbar();
+    wake();
+  });
   // Keep the toolbar's plugin buttons (label/enabled state) in sync.
   events.on('tour:step', () => renderToolbar());
   events.on('tour:completed', () => renderToolbar());
@@ -562,7 +588,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
             .filter((v) => v.visible)
             .map((v) => ({
               id: v.id,
-              label: v.label,
+              label: i18n.translate(v.label),
               x: v.x / width,
               y: v.y / height,
               occluded: v.occluded,
