@@ -137,7 +137,7 @@ export interface Address {
 
 export interface ComponentConfig {
   readonly id: string;
-  readonly label?: string;
+  readonly label?: I18nText;
   readonly nodes: readonly NodeRef[];
   readonly selectable: boolean;
   /**
@@ -167,7 +167,7 @@ export type HotspotAction =
 
 export interface HotspotConfig {
   readonly id: string;
-  readonly label: string;
+  readonly label: I18nText;
   readonly anchor: HotspotAnchor;
   /** Optional constant offset from the anchor, in model space. */
   readonly offset: readonly [number, number, number] | null;
@@ -236,7 +236,7 @@ export interface StateCameraIntentConfig {
  */
 export interface StateConfig {
   readonly id: string;
-  readonly label: string;
+  readonly label: I18nText;
   /** `'base'` (exclusive main region) or a modifier region id (parallel). */
   readonly region: string;
   /** Allowed source bases (bases only); `null` = any. */
