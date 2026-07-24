@@ -35,6 +35,8 @@ import {
   createLogger,
   createPluginManager,
   createPluginRenderStateFacade,
+  createPerfMetrics,
+  createQualityManager,
   EventBus,
   type Address,
   type EngineEventMap,
@@ -116,6 +118,28 @@ async function boot(app: HTMLDivElement): Promise<void> {
   for (const w of loaded.warnings) console.warn(`[config] ${w.path}: ${w.message}`);
   if (loaded.migratedFrom) console.info(`[config] migrated from ${loaded.migratedFrom}`);
 
+  const events = new EventBus<EngineEventMap>();
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // --- Diagnostics & Quality (Sprint 7, P9-T2): a headless Perf Metrics
+  // collector (FPS/frame time/scripting time, zero allocation per frame) feeds
+  // a headless Quality Manager that degrades/upgrades a discrete tier by
+  // driving ONLY the renderer lever already exposed by RendererPort
+  // (setPixelRatio, ch.14 §14.3). Picking desktop vs mobile budget is a HOST
+  // decision (the headless core does no device sniffing, L1/L8) — a simple
+  // viewport check is enough for this dev playground.
+  const perf = createPerfMetrics({ now: () => performance.now() });
+  const isMobileViewport = window.matchMedia('(max-width: 768px)').matches;
+  const perfBudget = isMobileViewport ? config.performance.mobile : config.performance.desktop;
+  const quality = createQualityManager({
+    levels: config.quality.levels,
+    renderer,
+    frameBudgetMs: perfBudget.frameBudgetMs,
+    initialLevel: config.quality.initialLevel,
+    adaptive: config.quality.adaptive,
+    events,
+  });
+
   // 2. Build the scene entirely FROM the config.
   const scene = createSceneManager();
   const camera = createCameraManager({
@@ -138,9 +162,6 @@ async function boot(app: HTMLDivElement): Promise<void> {
     enablePan: config.camera.controls.enablePan,
     enableZoom: config.camera.controls.enableZoom,
   });
-
-  const events = new EventBus<EngineEventMap>();
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // 3. Interaction + focus/animation stack. All visual state flows through the
   // resolver (L5); every animation goes through the headless Animation Engine.
@@ -493,6 +514,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
       cancel: (id) => cancelAnimationFrame(id),
     },
     render: () => {
+      perf.beginFrame();
       renderCount += 1;
       engine.update(performance.now()); // advance tweens/timelines (camera + RSR fades)
       const moving = controls.update();
@@ -514,9 +536,44 @@ async function boot(app: HTMLDivElement): Promise<void> {
         );
       }
       renderer.render(scene, camera);
+      perf.endFrame();
+      quality.sample(perf.frameTimeMs);
       if (moving || engine.hasActive) loop.requestRender();
     },
   });
+
+  // Developer performance/quality overlay (ch.14 §14.8): a plain DOM-confined
+  // HUD, refreshed on its OWN low-frequency ticker — never every frame, since
+  // polling `renderer.getStats()` and writing to the DOM that often would
+  // itself be exactly the kind of per-frame overhead chapter 14 warns against.
+  // Enabled via `config.performance.overlay` or `?perf=1` for quick local use.
+  const perfOverlayEnabled =
+    config.performance.overlay || new URLSearchParams(window.location.search).get('perf') === '1';
+  const perfOverlay = document.createElement('pre');
+  perfOverlay.className = 'ee-perf-overlay';
+  let perfOverlayInterval: number | undefined;
+  if (perfOverlayEnabled) {
+    document.body.appendChild(perfOverlay);
+    perfOverlayInterval = window.setInterval(() => {
+      perf.setRendererStats(renderer.getStats?.() ?? null);
+      const snap = perf.snapshot();
+      const lines = [
+        `FPS: ${snap.fps.toFixed(1)}`,
+        `Frame: ${snap.frameTimeMs.toFixed(2)} ms`,
+        `Script: ${snap.scriptingTimeMs.toFixed(2)} ms`,
+        `Quality: ${quality.level}${quality.adaptive ? '' : ' (manual)'}`,
+      ];
+      if (snap.rendererStats) {
+        lines.push(
+          `Draw calls: ${snap.rendererStats.drawCalls}`,
+          `Triangles: ${snap.rendererStats.triangles}`,
+          `Geometries: ${snap.rendererStats.geometries}`,
+          `Textures: ${snap.rendererStats.textures}`,
+        );
+      }
+      perfOverlay.textContent = lines.join('\n');
+    }, 500);
+  }
 
   const resize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -621,6 +678,9 @@ async function boot(app: HTMLDivElement): Promise<void> {
 
   const teardown = async () => {
     loop.dispose();
+    if (perfOverlayInterval !== undefined) window.clearInterval(perfOverlayInterval);
+    perfOverlay.remove();
+    quality.dispose();
     window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onKeyDown);
     canvas.removeEventListener('pointerdown', onPointerDown);
@@ -743,6 +803,12 @@ async function boot(app: HTMLDivElement): Promise<void> {
         shellShadow()?.querySelector('[data-slot="guided-tour-status"]')?.textContent ?? null,
       measureOverlayText: () =>
         shellShadow()?.querySelector('[data-slot="measure-overlay"]')?.textContent ?? null,
+      // Sprint 7 diagnostics / quality hooks.
+      perfMetrics: () => perf,
+      qualityManager: () => quality,
+      perfSnapshot: () => perf.snapshot(),
+      perfOverlayEnabled: () => perfOverlayEnabled,
+      perfOverlayText: () => (perfOverlayEnabled ? perfOverlay.textContent : null),
       teardown,
     };
   }
