@@ -19,6 +19,7 @@ import type {
   HotspotAnchor,
   HotspotConfig,
   I18nConfig,
+  I18nText,
   InstancingConfig,
   LightingConfig,
   LightingPresetId,
@@ -124,6 +125,14 @@ class Ctx {
       return fallback;
     }
     return v;
+  }
+  /** A displayable string: a literal, or an explicit `{ $t: key }` i18n reference (§5.3.15). */
+  i18nText(v: unknown, path: string, fallback: I18nText): I18nText {
+    if (v === undefined) return fallback;
+    if (isString(v)) return v;
+    if (isObject(v) && isString(v['$t'])) return { $t: v['$t'] };
+    this.error(path, 'must be a string or { $t: string }');
+    return fallback;
   }
   /** Bounded number: out-of-range → clamp + warning (§5.6 rule 6). */
   numClamped(v: unknown, path: string, fallback: number, min: number, max: number): number {
@@ -407,7 +416,7 @@ function validateComponents(ctx: Ctx, raw: unknown): ComponentConfig[] {
     out.push({
       id,
       ...(item['label'] !== undefined
-        ? { label: ctx.str(item['label'], `${base}.label`, id) }
+        ? { label: ctx.i18nText(item['label'], `${base}.label`, id) }
         : {}),
       nodes,
       selectable: ctx.bool(item['selectable'], `${base}.selectable`, true),
@@ -539,7 +548,7 @@ function validateHotspots(ctx: Ctx, raw: unknown): HotspotConfig[] {
 
     out.push({
       id,
-      label: ctx.str(item['label'], `${base}.label`, ''),
+      label: ctx.i18nText(item['label'], `${base}.label`, ''),
       anchor,
       offset:
         item['offset'] === undefined || item['offset'] === null
@@ -739,7 +748,7 @@ function validateStates(ctx: Ctx, raw: unknown): StateConfig[] {
 
     out.push({
       id,
-      label: ctx.str(item['label'], `${base}.label`, id),
+      label: ctx.i18nText(item['label'], `${base}.label`, id),
       region,
       allowedFrom,
       excludes,

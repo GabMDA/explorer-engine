@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "title": "Reference Watch",
+    "description": "Explorer Engine reference package (P10-T1) — a simple real-world object exercising hotspots, focus, one state, panels and theme.",
+    "defaultLocale": "en"
+  },
+  "model": {
+    "src": "models/watch.glb",
+    "frameOnLoad": true
+  },
+  "environment": {
+    "background": { "kind": "gradient", "top": "#2a3350", "bottom": "#0a0b12" },
+    "source": "neutral-room",
+    "intensity": 1
+  },
+  "lighting": { "preset": "studio" },
+  "camera": {
+    "fov": 45,
+    "controls": { "minDistance": 0.8, "maxDistance": 6, "enablePan": true, "enableZoom": true }
+  },
+  "components": [
+    { "id": "case", "label": "Case", "nodes": [{ "explorerId": "case" }] },
+    { "id": "face", "label": "Face", "nodes": [{ "explorerId": "face" }] },
+    { "id": "crown", "label": "Crown", "nodes": [{ "explorerId": "crown" }] },
+    {
+      "id": "strap",
+      "label": "Strap",
+      "nodes": [{ "explorerId": "strap-top" }, { "explorerId": "strap-bottom" }]
+    }
+  ],
+  "focus": {
+    "padding": 1.6,
+    "dimOthers": true,
+    "dimOpacity": 0.15,
+    "outline": { "enabled": true, "color": "#d4af37", "thickness": 1.5 },
+    "transition": { "duration": 600, "easing": "easeInOut" }
+  },
+  "hotspots": [
+    {
+      "id": "hs-face",
+      "label": "Inspect the face",
+      "anchor": { "kind": "component", "id": "face" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "face" } }
+    },
+    {
+      "id": "hs-crown",
+      "label": "Inspect the crown",
+      "anchor": { "kind": "component", "id": "crown" },
+      "action": { "type": "focus", "target": { "kind": "component", "id": "crown" } }
+    }
+  ],
+  "states": [
+    {
+      "id": "crown-out",
+      "label": "Crown out",
+      "region": "base",
+      "allowedFrom": null,
+      "layers": [
+        {
+          "target": { "kind": "component", "id": "crown" },
+          "channel": "transform",
+          "value": { "translate": [0.08, 0, 0] }
+        }
+      ],
+      "cameraIntent": { "position": [1.4, 0.5, 1.1], "target": [0.4, 0, 0] },
+      "transition": { "duration": 500, "easing": "easeInOut" }
+    }
+  ],
+  "theme": {
+    "preset": "auto",
+    "tokens": { "colorAccent": "#8a6d1f" },
+    "hotspotStyle": { "hotspotColor": "#d4af37", "hotspotColorActive": "#8a6d1f" }
+  },
+  "i18n": {
+    "locales": ["en"],
+    "sources": { "en": "locales/en.json" }
+  }
+}

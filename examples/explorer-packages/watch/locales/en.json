@@ -1,0 +1,9 @@
+{
+  "component.case": "Case",
+  "component.face": "Face",
+  "component.crown": "Crown",
+  "component.strap": "Strap",
+  "hotspot.face": "Inspect the face",
+  "hotspot.crown": "Inspect the crown",
+  "state.crown-out": "Crown out"
+}

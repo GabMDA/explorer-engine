@@ -1,6 +1,6 @@
 {
   "name": "@explorer-engine/input-dom",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "InputPort adapter — the ONLY package that handles DOM input events for controls. Translates pointer/wheel/keyboard into normalized ControlInput gestures. No Three.js.",
   "license": "UNLICENSED",
@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explorer-engine/core": "0.0.0"
+    "@explorer-engine/core": "1.0.0"
   }
 }

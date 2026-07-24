@@ -1,6 +1,6 @@
 {
   "name": "@explorer-engine/ui-webcomponents",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "UiPort adapter — default UI implemented with native Web Components (Shadow DOM, zero framework dependency, ch.12 §12.1.1).",
   "license": "UNLICENSED",
@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explorer-engine/core": "0.0.0"
+    "@explorer-engine/core": "1.0.0"
   }
 }

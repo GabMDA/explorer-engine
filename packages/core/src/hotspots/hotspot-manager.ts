@@ -5,7 +5,12 @@
 // It performs no projection (ProjectionPort/adapter) and no DOM (UI adapter). The
 // projected positions are hot data delivered through `applyProjection`, not the bus
 // (L11). Chapter 07 §7.11: logic here, marker rendering in the UI.
-import type { HotspotAction, HotspotConfig, ResolvedConfig } from '@explorer-engine/schema';
+import type {
+  HotspotAction,
+  HotspotConfig,
+  I18nText,
+  ResolvedConfig,
+} from '@explorer-engine/schema';
 import type { ComponentModel } from '../render-state/component-model';
 import type { AnchorSpec, ProjectionResult } from './projection-port';
 import type { EventBus } from '../events/event-bus';
@@ -18,7 +23,7 @@ export type HotspotVisualState = 'idle' | 'hover' | 'active' | 'occluded' | 'hid
 /** Data-only snapshot of one hotspot for the UI to render a marker + list entry. */
 export interface HotspotView {
   readonly id: string;
-  readonly label: string;
+  readonly label: I18nText;
   /** Screen position in CSS pixels (top-left origin). */
   readonly x: number;
   readonly y: number;

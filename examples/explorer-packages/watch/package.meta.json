@@ -1,0 +1,9 @@
+{
+  "name": "reference-watch",
+  "version": "1.0.0",
+  "author": "Explorer Engine",
+  "license": "UNLICENSED",
+  "description": "Simple reference Explorer Package (roadmap P10-T1) — a wristwatch with four components, two hotspots, one alternate state (crown pulled out), a custom theme accent and an English locale file.",
+  "createdAt": "2026-07-24",
+  "tags": ["reference", "simple", "watch", "p10-t1"]
+}
