@@ -112,6 +112,11 @@ export interface A11yNavigableChangedEvent {
   readonly entries: readonly A11yNavigableEntry[];
 }
 
+/** The active locale changed (ch.05 §5.3.15, `languageSelect` toolbar item). */
+export interface I18nLocaleChangedEvent {
+  readonly locale: string;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -130,5 +135,6 @@ export interface EngineEventMap {
   'theme:changed': ThemeChangedEvent;
   'a11y:announce': A11yAnnounceEvent;
   'a11y:navigable-changed': A11yNavigableChangedEvent;
+  'i18n:locale-changed': I18nLocaleChangedEvent;
   'ui:action': UiAction;
 }

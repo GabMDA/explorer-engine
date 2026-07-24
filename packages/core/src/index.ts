@@ -235,6 +235,10 @@ export type {
 export { createAccessibilityService } from './a11y';
 export type { AccessibilityService, AccessibilityServiceOptions } from './a11y';
 
+// i18n Service (chapter 05 §5.3.15, chapter 12 §12.9, P7-T4).
+export { createI18nService } from './i18n';
+export type { I18nService, I18nServiceOptions, LocaleDictionary } from './i18n';
+
 // Selection Manager (P4-T1).
 export { createSelectionManager } from './selection';
 export type {
@@ -273,6 +277,7 @@ export type {
   A11yAnnounceEvent,
   A11yNavigableEntry,
   A11yNavigableChangedEvent,
+  I18nLocaleChangedEvent,
   SelectionChangedEvent,
   SelectionHoverEvent,
   HotspotActivatedEvent,
