@@ -12,6 +12,7 @@ import type {
   ThemeConfig,
   ThemeTokens,
   I18nConfig,
+  InstancingConfig,
   PerformanceConfig,
   QualityConfig,
   QualityLevel,
@@ -45,11 +46,14 @@ export const DEFAULT_CAMERA: CameraConfig = {
   controls: DEFAULT_CONTROLS,
 };
 
+export const DEFAULT_INSTANCING: InstancingConfig = { enabled: true, minCount: 3 };
+
 export const MODEL_DEFAULTS = {
   draco: true,
   ktx2: true,
   meshopt: true,
   frameOnLoad: true,
+  instancing: DEFAULT_INSTANCING,
 } as const;
 
 /** All valid easing names (chapter 11 §11.4), for validation of the closed set. */

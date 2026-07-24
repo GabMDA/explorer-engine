@@ -22,12 +22,27 @@ export interface MetaConfig {
   readonly defaultLocale?: string;
 }
 
+/**
+ * Automatic-instancing policy (chapter 14 §14.3.1): repeated, non-addressable
+ * geometry (no `extras.explorerId` — ch.06 §6.3, ENGINE_CONSTITUTION L12) that
+ * shares the identical parsed mesh/material is merged into a single
+ * `InstancedMesh`, cutting N draw calls to 1. Detection is structural (same
+ * glTF mesh referenced by several nodes) — nothing to name, nothing to declare
+ * per node; `enabled`/`minCount` are the only authoring knobs.
+ */
+export interface InstancingConfig {
+  readonly enabled: boolean;
+  /** Minimum repeat count before a group is worth merging (>= 2). */
+  readonly minCount: number;
+}
+
 export interface ModelConfig {
   readonly src: string;
   readonly draco: boolean;
   readonly ktx2: boolean;
   readonly meshopt: boolean;
   readonly frameOnLoad: boolean;
+  readonly instancing: InstancingConfig;
 }
 
 export interface EnvironmentConfig {

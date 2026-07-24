@@ -20,6 +20,7 @@ export {
   DEFAULT_PERFORMANCE,
   DEFAULT_QUALITY,
   QUALITY_LEVELS,
+  DEFAULT_INSTANCING,
 } from './defaults';
 export {
   parseHexColor,
@@ -35,6 +36,7 @@ export type {
   EnvironmentSourceId,
   MetaConfig,
   ModelConfig,
+  InstancingConfig,
   EnvironmentConfig,
   LightingConfig,
   CameraControlsConfig,

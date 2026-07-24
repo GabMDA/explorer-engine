@@ -19,6 +19,7 @@ import type {
   HotspotAnchor,
   HotspotConfig,
   I18nConfig,
+  InstancingConfig,
   LightingConfig,
   LightingPresetId,
   MetaConfig,
@@ -217,6 +218,25 @@ function validateMeta(ctx: Ctx, raw: unknown): MetaConfig {
   return meta;
 }
 
+function validateInstancing(ctx: Ctx, raw: unknown): InstancingConfig {
+  const fallback = MODEL_DEFAULTS.instancing;
+  if (raw === undefined) return fallback;
+  if (!isObject(raw)) {
+    ctx.error('model.instancing', 'must be an object { enabled?, minCount? }');
+    return fallback;
+  }
+  return {
+    enabled: ctx.bool(raw['enabled'], 'model.instancing.enabled', fallback.enabled),
+    minCount: ctx.numClamped(
+      raw['minCount'],
+      'model.instancing.minCount',
+      fallback.minCount,
+      2,
+      1000,
+    ),
+  };
+}
+
 function validateModel(ctx: Ctx, raw: unknown): ModelConfig {
   if (!isObject(raw)) {
     ctx.error('model', 'is required and must be an object');
@@ -231,6 +251,7 @@ function validateModel(ctx: Ctx, raw: unknown): ModelConfig {
     ktx2: ctx.bool(raw['ktx2'], 'model.ktx2', MODEL_DEFAULTS.ktx2),
     meshopt: ctx.bool(raw['meshopt'], 'model.meshopt', MODEL_DEFAULTS.meshopt),
     frameOnLoad: ctx.bool(raw['frameOnLoad'], 'model.frameOnLoad', MODEL_DEFAULTS.frameOnLoad),
+    instancing: validateInstancing(ctx, raw['instancing']),
   };
 }
 

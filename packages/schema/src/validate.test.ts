@@ -323,6 +323,38 @@ describe('validateConfig', () => {
   });
 });
 
+describe('validateConfig — model.instancing (chapter 14 §14.3.1)', () => {
+  it('defaults to enabled=true, minCount=3', () => {
+    const r = validateConfig(minimal);
+    expect(r.value?.model.instancing).toEqual({ enabled: true, minCount: 3 });
+  });
+
+  it('accepts explicit overrides', () => {
+    const r = validateConfig({
+      ...minimal,
+      model: { src: 'm.glb', instancing: { enabled: false, minCount: 5 } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.model.instancing).toEqual({ enabled: false, minCount: 5 });
+  });
+
+  it('clamps minCount below 2 and warns', () => {
+    const r = validateConfig({
+      ...minimal,
+      model: { src: 'm.glb', instancing: { minCount: 1 } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.model.instancing.minCount).toBe(2);
+    expect(r.warnings.some((w) => w.path === 'model.instancing.minCount')).toBe(true);
+  });
+
+  it('rejects a non-object model.instancing', () => {
+    const r = validateConfig({ ...minimal, model: { src: 'm.glb', instancing: 'yes' } });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'model.instancing')).toBe(true);
+  });
+});
+
 describe('validateConfig — theme (chapter 13)', () => {
   it('defaults to preset "auto" with no token overrides', () => {
     const r = validateConfig(minimal);
