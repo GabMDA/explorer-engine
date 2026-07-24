@@ -30,11 +30,13 @@ import type {
   OrbitControls,
   EventBus,
   EngineEventMap,
+  InstancingConfig,
 } from '@explorer-engine/core';
 import type { SceneManager } from './scene-manager';
 import type { CameraManager } from './camera-manager';
 import type { ThreeRendererHandle } from './internal/handles';
 import { createNodeIndex } from './node-index';
+import { applyInstancing } from './instancing';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -73,6 +75,8 @@ export interface ModelLoaderOptions {
    * KTX2Loader.detectSupport. Adapter-only — no Three.js type leaks to the Core.
    */
   readonly renderer?: ThreeRendererHandle;
+  /** Automatic-instancing policy (ch.14 §14.3.1). Omit ⇒ disabled (no merge). */
+  readonly instancing?: InstancingConfig;
 }
 
 function errorMessage(error: unknown): string {
@@ -181,7 +185,9 @@ export function createModelLoader(options: ModelLoaderOptions): ModelLoaderPort 
     let bytes: Uint8Array;
     let url: string;
     try {
-      const data = await resourceManager.load(request.path);
+      // The model is the critical-path asset (ch.14 §14.5.1): it blocks the
+      // first render, so it always loads at the highest cascade priority.
+      const data = await resourceManager.load(request.path, { priority: 'critical' });
       bytes = data.bytes;
       url = data.url;
     } catch (error) {
@@ -212,6 +218,11 @@ export function createModelLoader(options: ModelLoaderOptions): ModelLoaderPort 
     removeCurrent();
     current = gltf.scene;
     scene.add(current);
+
+    // Instancing (P9-T1, ch.14 §14.3.1): merge repeated, non-addressable geometry
+    // into InstancedMeshes BEFORE indexing, so merged-away nodes never enter the
+    // node index (they were never meant to be individually resolvable — L12/L5).
+    if (options.instancing) applyInstancing(current, options.instancing);
 
     // Build the node index (P2-T4) and expose it on the Scene Manager.
     const index = createNodeIndex(current);
