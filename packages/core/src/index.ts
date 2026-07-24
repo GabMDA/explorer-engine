@@ -239,6 +239,18 @@ export type { AccessibilityService, AccessibilityServiceOptions } from './a11y';
 export { createI18nService } from './i18n';
 export type { I18nService, I18nServiceOptions, LocaleDictionary } from './i18n';
 
+// Plugin Manager (chapter 02 §2.18, chapter 10, ADR-006, P8-T1).
+export { createPluginManager, createPluginRenderStateFacade, PLUGIN_MIN_PRIORITY } from './plugins';
+export type {
+  PluginManager,
+  PluginManagerOptions,
+  Plugin,
+  PluginContext,
+  PluginRenderStateFacade,
+  PluginFocusFacade,
+  PluginStateFacade,
+} from './plugins';
+
 // Selection Manager (P4-T1).
 export { createSelectionManager } from './selection';
 export type {
@@ -278,6 +290,16 @@ export type {
   A11yNavigableEntry,
   A11yNavigableChangedEvent,
   I18nLocaleChangedEvent,
+  PluginRegisteredEvent,
+  PluginStartedEvent,
+  PluginStoppedEvent,
+  PluginDisposedEvent,
+  PluginErrorPhase,
+  PluginErrorEvent,
+  TourStepEvent,
+  TourCompletedEvent,
+  MeasurePointAddedEvent,
+  MeasureCompletedEvent,
   SelectionChangedEvent,
   SelectionHoverEvent,
   HotspotActivatedEvent,

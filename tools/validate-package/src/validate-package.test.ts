@@ -176,4 +176,29 @@ describe('validatePackage', () => {
     expect(badReport.ok).toBe(false);
     expect(badReport.errors.some((e) => e.message.includes('node name "Nope"'))).toBe(true);
   });
+
+  it('accepts a package declaring requiredCapabilities and plugins (chapter 10)', () => {
+    const cfg = JSON.stringify({
+      schemaVersion: '1.0',
+      model: { src: 'models/m.glb' },
+      components: [{ id: 'crown', nodes: [{ explorerId: 'crown' }] }],
+      requiredCapabilities: [{ id: 'scenario' }, { id: 'measure', level: 'optional' }],
+      plugins: [{ id: 'guided-tour', options: { steps: ['crown'] } }],
+    });
+    const report = validatePackage(memFs({ 'config.json': cfg, 'models/m.glb': glbWithNodes }));
+    expect(report.ok).toBe(true);
+    expect(report.errors).toHaveLength(0);
+  });
+
+  it('surfaces a malformed plugins entry as a package error', () => {
+    const cfg = JSON.stringify({
+      schemaVersion: '1.0',
+      model: { src: 'models/m.glb' },
+      components: [{ id: 'crown', nodes: [{ explorerId: 'crown' }] }],
+      plugins: [{ options: {} }], // missing id
+    });
+    const report = validatePackage(memFs({ 'config.json': cfg, 'models/m.glb': glbWithNodes }));
+    expect(report.ok).toBe(false);
+    expect(report.errors.some((e) => e.path === 'plugins[0].id')).toBe(true);
+  });
 });

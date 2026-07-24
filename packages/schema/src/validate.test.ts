@@ -394,6 +394,74 @@ describe('validateConfig — i18n (chapter 05 §5.3.15)', () => {
   });
 });
 
+describe('validateConfig — requiredCapabilities (chapter 05 §5.3.1bis)', () => {
+  it('defaults to an empty array', () => {
+    const r = validateConfig(minimal);
+    expect(r.value?.requiredCapabilities).toEqual([]);
+  });
+
+  it('accepts required/optional entries, defaulting level to "required"', () => {
+    const r = validateConfig({
+      ...minimal,
+      requiredCapabilities: [{ id: 'scenario' }, { id: 'measure', level: 'optional' }],
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.requiredCapabilities).toEqual([
+      { id: 'scenario', level: 'required' },
+      { id: 'measure', level: 'optional' },
+    ]);
+  });
+
+  it('rejects a missing id, an invalid level, and warns on a duplicate id', () => {
+    const r = validateConfig({
+      ...minimal,
+      requiredCapabilities: [
+        { level: 'required' },
+        { id: 'x', level: 'bogus' },
+        { id: 'y' },
+        { id: 'y' },
+      ],
+    });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'requiredCapabilities[0].id')).toBe(true);
+    expect(r.errors.some((e) => e.path === 'requiredCapabilities[1].level')).toBe(true);
+    expect(r.warnings.some((w) => w.path === 'requiredCapabilities[3].id')).toBe(true);
+  });
+});
+
+describe('validateConfig — plugins (chapter 05 §5.3.14)', () => {
+  it('defaults to an empty array', () => {
+    const r = validateConfig(minimal);
+    expect(r.value?.plugins).toEqual([]);
+  });
+
+  it('accepts entries and defaults enabled/options', () => {
+    const r = validateConfig({
+      ...minimal,
+      plugins: [
+        { id: 'guided-tour', options: { steps: ['gpu'] } },
+        { id: 'measure', enabled: false },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    expect(r.value?.plugins).toEqual([
+      { id: 'guided-tour', enabled: true, options: { steps: ['gpu'] } },
+      { id: 'measure', enabled: false, options: {} },
+    ]);
+  });
+
+  it('rejects a missing id and a non-object options, errors on a duplicate id', () => {
+    const r = validateConfig({
+      ...minimal,
+      plugins: [{}, { id: 'x', options: 'nope' }, { id: 'y' }, { id: 'y' }],
+    });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path === 'plugins[0].id')).toBe(true);
+    expect(r.errors.some((e) => e.path === 'plugins[1].options')).toBe(true);
+    expect(r.errors.some((e) => e.path === 'plugins[3].id')).toBe(true);
+  });
+});
+
 describe('migrateConfig', () => {
   it('migrates a 0.9 config (model.file → model.src) up to 1.0, then validates', () => {
     const legacy = { schemaVersion: '0.9', model: { file: 'models/old.glb' } };

@@ -56,6 +56,8 @@ export type {
   ThemeConfig,
   I18nText,
   I18nConfig,
+  Capability,
+  PluginEntry,
   ResolvedConfig,
   ConfigIssue,
   ValidationResult,

@@ -6,6 +6,7 @@
 import type { BoundingBox } from '../ports/scene-port';
 import type { ModelLoadPhase } from '../model/model-loader-port';
 import type { UiAction } from '../ports/ui-port';
+import type { Vec3 } from '../ports/camera-port';
 import type { Address, HotspotAction, ThemeTokens } from '@explorer-engine/schema';
 
 export interface EngineDisposedEvent {
@@ -117,6 +118,70 @@ export interface I18nLocaleChangedEvent {
   readonly locale: string;
 }
 
+/** A plugin lifecycle hook completed successfully (ch.10 §10.4). */
+export interface PluginRegisteredEvent {
+  readonly id: string;
+}
+
+/** A plugin finished `start` and is now active (ch.10 §10.4). */
+export interface PluginStartedEvent {
+  readonly id: string;
+}
+
+/** A plugin finished `stop`. */
+export interface PluginStoppedEvent {
+  readonly id: string;
+}
+
+/** A plugin finished `dispose` and was released. */
+export interface PluginDisposedEvent {
+  readonly id: string;
+}
+
+/** Where a plugin failed: a lifecycle hook, or the pre-hook resolution pass
+ * (missing capability, incompatibility, `orderAfter` cycle — ch.10 §10.5.2). */
+export type PluginErrorPhase = 'resolve' | 'register' | 'init' | 'start' | 'stop' | 'dispose';
+
+/** A plugin failed and was isolated (L17) — it never breaks the engine or its
+ * siblings. Always logged (L24); never a silent failure. */
+export interface PluginErrorEvent {
+  readonly id: string;
+  readonly phase: PluginErrorPhase;
+  readonly message: string;
+}
+
+// --- Official plugin events (ch.10 §10.7.1/§10.7.2) — the catalog is the ------
+// meeting point between core and official plugins (ADR-004); each plugin's own
+// events are registered here, namespaced by its `id` field in the payload so
+// multiple instances of the same plugin stay distinguishable.
+
+/** Guided Tour entered a step (ch.10 §10.7.1). */
+export interface TourStepEvent {
+  readonly id: string;
+  readonly index: number;
+  readonly total: number;
+  readonly target: string;
+}
+
+/** Guided Tour finished — naturally, or via an explicit interruption. */
+export interface TourCompletedEvent {
+  readonly id: string;
+  readonly interrupted: boolean;
+}
+
+/** Measure recorded one of its two points (ch.10 §10.7.2). */
+export interface MeasurePointAddedEvent {
+  readonly id: string;
+  readonly index: 0 | 1;
+  readonly point: Vec3;
+}
+
+/** Measure has both points; the distance is final for this measurement. */
+export interface MeasureCompletedEvent {
+  readonly id: string;
+  readonly distance: number;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -137,4 +202,13 @@ export interface EngineEventMap {
   'a11y:navigable-changed': A11yNavigableChangedEvent;
   'i18n:locale-changed': I18nLocaleChangedEvent;
   'ui:action': UiAction;
+  'plugin:registered': PluginRegisteredEvent;
+  'plugin:started': PluginStartedEvent;
+  'plugin:stopped': PluginStoppedEvent;
+  'plugin:disposed': PluginDisposedEvent;
+  'plugin:error': PluginErrorEvent;
+  'tour:step': TourStepEvent;
+  'tour:completed': TourCompletedEvent;
+  'measure:point-added': MeasurePointAddedEvent;
+  'measure:completed': MeasureCompletedEvent;
 }

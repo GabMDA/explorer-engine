@@ -1,17 +1,19 @@
-// Explorer Engine — development playground (Sprint 5: UI Web Components).
+// Explorer Engine — development playground (Sprint 6: Plugins).
 //
 // The playground is a GENERIC composition root: it fetches a config.json through
 // the Config Loader (core), then builds the scene ENTIRELY from that resolved
 // config — lighting, environment, camera, controls, model, AND the interaction +
 // focus/animation + state stack (Render State Resolver, Animation Engine, Selection,
 // Hotspots, Focus Manager, camera intent controller, State Manager) — PLUS the UI
-// overlay (Theme/Accessibility/i18n services + the default UiPort adapter). There
-// is no object-specific code: the same code drives any config (proof of L1/L2).
+// overlay (Theme/Accessibility/i18n services + the default UiPort adapter) AND the
+// Plugin Manager, which registers the two official reference plugins (Guided Tour,
+// Measure) and activates them declaratively via `config.plugins`. There is no
+// object-specific code: the same code drives any config (proof of L1/L2).
 //
 //   ?config=minimal      minimal single-cube config (default)
 //   ?config=indexed      multi-node model, exercises the node index (P2-T4)
 //   ?config=interactive  components + hotspots + focus, exercises Sprint 2/3
-//   ?config=states       bases + modifiers + UI (theme/i18n/a11y), Sprint 4/5
+//   ?config=states       bases + modifiers + UI + plugins, Sprint 4/5/6
 import {
   createOrbitControls,
   getLightingPreset,
@@ -30,12 +32,16 @@ import {
   createThemeManager,
   createAccessibilityService,
   createI18nService,
+  createLogger,
+  createPluginManager,
+  createPluginRenderStateFacade,
   EventBus,
   type Address,
   type EngineEventMap,
   type ResolvedConfig,
   type ToolbarItemDescriptor,
   type BreadcrumbSegmentDescriptor,
+  type PluginContext,
 } from '@explorer-engine/core';
 import {
   createThreeRenderer,
@@ -54,6 +60,8 @@ import {
 import { createFetchTransport } from '@explorer-engine/resource-fetch';
 import { createDomInput } from '@explorer-engine/input-dom';
 import { createDomUiPort, wireSystemPreferences } from '@explorer-engine/ui-webcomponents';
+import { createGuidedTourPlugin } from '@explorer-engine/plugin-guided-tour';
+import { createMeasurePlugin } from '@explorer-engine/plugin-measure';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -229,6 +237,51 @@ async function boot(app: HTMLDivElement): Promise<void> {
   i18n.registerDictionary('en', { 'ui.reset': 'Reset' });
   i18n.registerDictionary('fr', { 'ui.reset': 'Réinitialiser' });
 
+  // --- Plugins (Sprint 6, P8): headless Plugin Manager + the two official
+  // reference plugins, registered PROGRAMMATICALLY (ch.10 §10.5.1 — the HOST
+  // supplies plugin code; a package never does) and ACTIVATED declaratively via
+  // `config.plugins` (a package only turns a registered plugin on/off). Each
+  // plugin only ever sees the restricted PluginContext facade built here — never
+  // a manager directly — and depends only on @explorer-engine/plugin-sdk.
+  const logger = createLogger();
+  const pluginManager = createPluginManager({ events, logger });
+  const guidedTour = createGuidedTourPlugin({ steps: [] });
+  const measure = createMeasurePlugin();
+
+  const buildPluginContext = (pluginId: string): PluginContext => {
+    const entry = config.plugins.find((p) => p.id === pluginId);
+    return {
+      pluginId,
+      events,
+      logger: logger.child(pluginId),
+      config: { options: entry?.options ?? {}, resolved: config },
+      resolver: createPluginRenderStateFacade(resolver, pluginId),
+      components,
+      resources: { load: (path: string) => resourceManager.load(path) },
+      animation: { play: (animation, opts) => engine.play(animation, opts) },
+      focus: {
+        focus: (target) => focus.focus(target),
+        back: () => focus.back(),
+        getCurrent: () => focus.getCurrent(),
+      },
+      state: {
+        goToState: (stateId) => stateManager.goToState(stateId),
+        getBase: () => stateManager.getBase(),
+        getModifiers: () => stateManager.getModifiers(),
+      },
+      ui: uiPort,
+      raycaster: { pick: (nx: number, ny: number) => raycaster.pick(nx, ny) },
+    };
+  };
+
+  const isActivated = (id: string): boolean => config.plugins.some((p) => p.id === id && p.enabled);
+  if (isActivated('guided-tour')) {
+    pluginManager.registerPlugin(guidedTour, () => buildPluginContext('guided-tour'));
+  }
+  if (isActivated('measure')) {
+    pluginManager.registerPlugin(measure, () => buildPluginContext('measure'));
+  }
+
   const renderBreadcrumb = (): void => {
     const stack = focus.getStack();
     const segments: BreadcrumbSegmentDescriptor[] = [
@@ -277,8 +330,32 @@ async function boot(app: HTMLDivElement): Promise<void> {
             active: locale === i18n.getLocale(),
           }))
         : []),
-      { kind: 'fullscreen', id: 'fullscreen', label: 'Fullscreen' },
     ];
+    const active = pluginManager.getActivePluginIds();
+    if (active.includes('guided-tour')) {
+      items.push(
+        {
+          kind: 'custom',
+          id: 'guided-tour-next',
+          label: guidedTour.getCurrentStepIndex() === null ? 'Start Tour' : 'Next Step',
+        },
+        {
+          kind: 'custom',
+          id: 'guided-tour-stop',
+          label: 'Stop Tour',
+          disabled: guidedTour.getCurrentStepIndex() === null,
+        },
+      );
+    }
+    if (active.includes('measure')) {
+      items.push({
+        kind: 'custom',
+        id: 'measure-toggle',
+        label: measure.isActive() ? 'Measure: ON' : 'Measure: OFF',
+        active: measure.isActive(),
+      });
+    }
+    items.push({ kind: 'fullscreen', id: 'fullscreen', label: 'Fullscreen' });
     uiPort.setToolbar(items);
   };
 
@@ -323,6 +400,14 @@ async function boot(app: HTMLDivElement): Promise<void> {
   });
   events.on('theme:changed', () => renderToolbar());
   events.on('i18n:locale-changed', () => renderToolbar());
+  // Keep the toolbar's plugin buttons (label/enabled state) in sync.
+  events.on('tour:step', () => renderToolbar());
+  events.on('tour:completed', () => renderToolbar());
+  events.on('measure:point-added', () => renderToolbar());
+  events.on('measure:completed', () => renderToolbar());
+  // NOTE: no separate `plugin:error` listener here — the Plugin Manager already
+  // logs every isolated failure through this SAME `logger` instance (L24);
+  // adding another would just duplicate the diagnostic.
   events.on('model:loading', (e) => {
     uiPort.setLoader({
       visible: true,
@@ -380,13 +465,23 @@ async function boot(app: HTMLDivElement): Promise<void> {
           const hotspotId = (action.payload as { hotspotId?: unknown }).hotspotId;
           if (typeof hotspotId === 'string') hotspots.activate(hotspotId);
           wake();
+        } else if (action.id === 'guided-tour-next') {
+          if (guidedTour.getCurrentStepIndex() === null) guidedTour.startTour();
+          else guidedTour.next();
+          wake();
+        } else if (action.id === 'guided-tour-stop') {
+          guidedTour.stopTour();
+          wake();
+        } else if (action.id === 'measure-toggle') {
+          measure.setActive(!measure.isActive());
+          renderToolbar();
         }
         break;
     }
   });
 
-  // Plugin slot demonstration (P8 lands the real plugin system later; this only
-  // proves the descriptor-based slot mechanism end to end).
+  // Generic status slot (node count once the model loads) — unrelated to any
+  // specific plugin, just a demonstration of the descriptor-based slot mechanism.
   uiPort.registerSlot('status');
 
   // On-demand render loop (P1-T5): advance animations, compose visual state, project
@@ -458,6 +553,14 @@ async function boot(app: HTMLDivElement): Promise<void> {
   const onPointerUp = (e: PointerEvent) => {
     if (dragging) return; // was an orbit gesture
     const [nx, ny] = toNdc(e.clientX, e.clientY);
+    // Reuses the SAME pick gesture the existing Selection system already
+    // computes (sans modifier son architecture) — Measure just consumes it
+    // instead of Selection while its own mode is active.
+    if (measure.isActive()) {
+      measure.pickAt(nx, ny);
+      wake();
+      return;
+    }
     selection.selectAt(nx, ny);
   };
   canvas.addEventListener('pointerdown', onPointerDown);
@@ -492,7 +595,7 @@ async function boot(app: HTMLDivElement): Promise<void> {
   let modelError: string | null = null;
   const modelReady = modelLoader
     .load({ path: config.model.src })
-    .then(() => {
+    .then(async () => {
       const n = scene.getNodeIndex()?.size ?? 0;
       const hs = hotspots.count;
       // Seed the camera "home" pose from the auto-framing, so exiting a focus
@@ -504,13 +607,19 @@ async function boot(app: HTMLDivElement): Promise<void> {
         type: 'div',
         props: { class: 'ee-status-slot', text: `${n} node(s) loaded` },
       });
+      // Plugins start once "the experience is ready" (ch.10 §10.4) — resolves
+      // capabilities/orderAfter/incompatibilities, then register->init->start
+      // each activated plugin, isolating any failure (L17) without affecting
+      // the others or the engine.
+      await pluginManager.start();
+      renderToolbar(); // reveal any plugin toolbar buttons now that they're active
       wake();
     })
     .catch((error: unknown) => {
       modelError = error instanceof Error ? error.message : String(error);
     });
 
-  const teardown = () => {
+  const teardown = async () => {
     loop.dispose();
     window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onKeyDown);
@@ -520,6 +629,9 @@ async function boot(app: HTMLDivElement): Promise<void> {
     input.dispose();
     controls.dispose();
     modelLoader.dispose();
+    // Plugins first — their own dispose hooks may still touch the resolver/UI/
+    // events, which must stay alive until every plugin has released everything.
+    await pluginManager.dispose();
     unwireSystemPreferences();
     uiPort.dispose();
     themeManager.dispose();
@@ -622,6 +734,15 @@ async function boot(app: HTMLDivElement): Promise<void> {
         ),
       statusSlotText: () =>
         shellShadow()?.querySelector('[data-slot="status"]')?.textContent ?? null,
+      // Sprint 6 plugin hooks.
+      pluginManager: () => pluginManager,
+      activePluginIds: () => pluginManager.getActivePluginIds(),
+      guidedTour: () => guidedTour,
+      measure: () => measure,
+      tourStatusText: () =>
+        shellShadow()?.querySelector('[data-slot="guided-tour-status"]')?.textContent ?? null,
+      measureOverlayText: () =>
+        shellShadow()?.querySelector('[data-slot="measure-overlay"]')?.textContent ?? null,
       teardown,
     };
   }

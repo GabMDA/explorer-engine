@@ -1,8 +1,8 @@
 {
-  "name": "@explorer-engine/plugin-sdk",
+  "name": "@explorer-engine/plugin-measure",
   "version": "0.0.0",
   "private": true,
-  "description": "Stable, framework-agnostic API for authoring plugins (a pure re-export façade over @explorer-engine/core's plugin contract — no business logic). The ONLY dependency a plugin may take.",
+  "description": "Official reference plugin (ch.10 §10.7.2): measures the real-world distance between two picked points, entirely through @explorer-engine/plugin-sdk.",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explorer-engine/core": "0.0.0"
+    "@explorer-engine/plugin-sdk": "0.0.0"
   }
 }

@@ -1,7 +1,9 @@
 # @explorer-engine/plugin-sdk
 
-Stable, framework-agnostic API for authoring plugins (depends on core port contracts, never on core internals). No code yet (P0-T1).
+Stable, framework-agnostic API for authoring plugins — a pure re-export façade
+over `@explorer-engine/core`'s plugin contract. No business logic of its own.
 
-- **Statut** : squelette P0-T1 (aucun code — scaffolding uniquement).
+- **Statut** : P8-T1 (Sprint 6, Phase 2) — façade réelle.
 - **Référence** : chapitre 10 ; ADR-006.
-- **Implémentation** : reportée aux tâches ultérieures de la roadmap.
+- **Règle** : un plugin dépend **uniquement** de ce package, jamais de
+  `@explorer-engine/core` directement (ch.03 §3.4).
