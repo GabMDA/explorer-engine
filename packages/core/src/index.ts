@@ -37,6 +37,17 @@ export type {
   EnvironmentSource,
   EnvironmentSpec,
   EnvironmentPort,
+  UiDescriptor,
+  ToolbarItemKind,
+  ToolbarItemDescriptor,
+  BreadcrumbSegmentDescriptor,
+  PanelBlock,
+  PanelDescriptor,
+  LoaderStateDescriptor,
+  HotspotMarkerDescriptor,
+  ShellDescriptor,
+  UiAction,
+  UiPort,
 } from './ports';
 
 export { createOrbitControls } from './controls';
@@ -115,11 +126,24 @@ export type {
   StateLayerConfig,
   StateCameraIntentConfig,
   StateConfig,
+  ThemePreset,
+  ThemeTokens,
+  ThemeConfig,
+  I18nText,
+  I18nConfig,
   ConfigIssue,
   ValidationResult,
 } from '@explorer-engine/schema';
 // Re-export the schema's data-only default values used by adapters/hosts.
-export { DEFAULT_FOCUS, DEFAULT_FOCUS_TRANSITION, EASE_NAMES } from '@explorer-engine/schema';
+export {
+  DEFAULT_FOCUS,
+  DEFAULT_FOCUS_TRANSITION,
+  EASE_NAMES,
+  DEFAULT_THEME,
+  DEFAULT_THEME_TOKENS_LIGHT,
+  DEFAULT_THEME_TOKENS_DARK,
+  DEFAULT_I18N,
+} from '@explorer-engine/schema';
 
 // Render State Resolver (chapter 19, ADR-001) — the single authority over visual state.
 export {

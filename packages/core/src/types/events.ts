@@ -5,6 +5,7 @@
 // The bus is compile-time checked against this map.
 import type { BoundingBox } from '../ports/scene-port';
 import type { ModelLoadPhase } from '../model/model-loader-port';
+import type { UiAction } from '../ports/ui-port';
 import type { Address, HotspotAction } from '@explorer-engine/schema';
 
 export interface EngineDisposedEvent {
@@ -95,4 +96,5 @@ export interface EngineEventMap {
   'state:changing': StateChangingEvent;
   'state:changed': StateChangedEvent;
   'modifier:changed': ModifierChangedEvent;
+  'ui:action': UiAction;
 }
