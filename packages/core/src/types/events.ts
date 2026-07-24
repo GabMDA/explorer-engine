@@ -7,7 +7,7 @@ import type { BoundingBox } from '../ports/scene-port';
 import type { ModelLoadPhase } from '../model/model-loader-port';
 import type { UiAction } from '../ports/ui-port';
 import type { Vec3 } from '../ports/camera-port';
-import type { Address, HotspotAction, ThemeTokens } from '@explorer-engine/schema';
+import type { Address, HotspotAction, QualityLevel, ThemeTokens } from '@explorer-engine/schema';
 
 export interface EngineDisposedEvent {
   /** Epoch milliseconds at which disposal occurred. */
@@ -182,6 +182,15 @@ export interface MeasureCompletedEvent {
   readonly distance: number;
 }
 
+/** Why the Quality Manager changed tier (roadmap P9-T2, chapter 14 §14.2.2). */
+export type QualityChangeReason = 'auto' | 'manual';
+
+/** The active quality tier changed — automatically (adaptive) or by explicit request. */
+export interface QualityChangedEvent {
+  readonly level: QualityLevel;
+  readonly reason: QualityChangeReason;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -211,4 +220,5 @@ export interface EngineEventMap {
   'tour:completed': TourCompletedEvent;
   'measure:point-added': MeasurePointAddedEvent;
   'measure:completed': MeasureCompletedEvent;
+  'quality:changed': QualityChangedEvent;
 }
