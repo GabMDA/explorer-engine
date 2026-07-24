@@ -2,7 +2,19 @@
   "name": "@explorer-engine/plugin-sdk",
   "version": "0.0.0",
   "private": true,
-  "description": "Stable, framework-agnostic API for authoring plugins (depends on core port contracts, never on core internals). No code yet (P0-T1).",
+  "description": "Stable, framework-agnostic API for authoring plugins (a pure re-export façade over @explorer-engine/core's plugin contract — no business logic). The ONLY dependency a plugin may take.",
   "license": "UNLICENSED",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@explorer-engine/core": "0.0.0"
+  }
 }

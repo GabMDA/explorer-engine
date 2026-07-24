@@ -6,6 +6,7 @@
 import type { BoundingBox } from '../ports/scene-port';
 import type { ModelLoadPhase } from '../model/model-loader-port';
 import type { UiAction } from '../ports/ui-port';
+import type { Vec3 } from '../ports/camera-port';
 import type { Address, HotspotAction, ThemeTokens } from '@explorer-engine/schema';
 
 export interface EngineDisposedEvent {
@@ -149,6 +150,38 @@ export interface PluginErrorEvent {
   readonly message: string;
 }
 
+// --- Official plugin events (ch.10 §10.7.1/§10.7.2) — the catalog is the ------
+// meeting point between core and official plugins (ADR-004); each plugin's own
+// events are registered here, namespaced by its `id` field in the payload so
+// multiple instances of the same plugin stay distinguishable.
+
+/** Guided Tour entered a step (ch.10 §10.7.1). */
+export interface TourStepEvent {
+  readonly id: string;
+  readonly index: number;
+  readonly total: number;
+  readonly target: string;
+}
+
+/** Guided Tour finished — naturally, or via an explicit interruption. */
+export interface TourCompletedEvent {
+  readonly id: string;
+  readonly interrupted: boolean;
+}
+
+/** Measure recorded one of its two points (ch.10 §10.7.2). */
+export interface MeasurePointAddedEvent {
+  readonly id: string;
+  readonly index: 0 | 1;
+  readonly point: Vec3;
+}
+
+/** Measure has both points; the distance is final for this measurement. */
+export interface MeasureCompletedEvent {
+  readonly id: string;
+  readonly distance: number;
+}
+
 export interface EngineEventMap {
   'engine:disposed': EngineDisposedEvent;
   'model:loading': ModelLoadingEvent;
@@ -174,4 +207,8 @@ export interface EngineEventMap {
   'plugin:stopped': PluginStoppedEvent;
   'plugin:disposed': PluginDisposedEvent;
   'plugin:error': PluginErrorEvent;
+  'tour:step': TourStepEvent;
+  'tour:completed': TourCompletedEvent;
+  'measure:point-added': MeasurePointAddedEvent;
+  'measure:completed': MeasureCompletedEvent;
 }
